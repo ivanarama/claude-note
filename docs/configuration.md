@@ -150,7 +150,7 @@ session_timeout_minutes = 30  # default
 
 ### QMD Settings
 
-[QMD](https://github.com/amir-arad/qmd) integration for semantic search.
+[QMD](https://github.com/tobi/qmd) integration for semantic search.
 
 ```toml
 [qmd]

@@ -109,7 +109,7 @@ if command -v qmd &>/dev/null; then
 else
     echo -e "  ${YELLOW}!${NC} qmd not found (semantic search disabled)"
     echo "    Synthesis will work but without vault context."
-    echo "    Install qmd for better results: https://github.com/amir-arad/qmd"
+    echo "    Install qmd for better results: https://github.com/tobi/qmd"
     echo
     read -p "    Continue without qmd? [Y/n] " CONTINUE_NO_QMD
     if [[ "$CONTINUE_NO_QMD" =~ ^[Nn] ]]; then

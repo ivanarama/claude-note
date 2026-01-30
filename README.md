@@ -193,7 +193,7 @@ This removes the service, CLI, and source files. Your vault data is preserved.
 
 ## Optional: QMD Integration
 
-If you have [qmd](https://github.com/amir-arad/qmd) installed for semantic search, enable it in config:
+If you have [qmd](https://github.com/tobi/qmd) installed for semantic search, enable it in config:
 
 ```toml
 [qmd]

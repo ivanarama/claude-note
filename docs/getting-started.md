@@ -22,7 +22,7 @@ When you work with Claude Code, valuable insights emerge: debugging techniques, 
 | Dependency | Purpose |
 |------------|---------|
 | [Claude CLI](https://claude.ai/download) | Required for knowledge synthesis. Without it, only session logging works. |
-| [qmd](https://github.com/amir-arad/qmd) | Semantic search for better synthesis context. Helps Claude understand your existing notes. |
+| [qmd](https://github.com/tobi/qmd) | Semantic search for better synthesis context. Helps Claude understand your existing notes. |
 | pandoc | Required for document ingestion (PDF/DOCX support) |
 
 ## Installation

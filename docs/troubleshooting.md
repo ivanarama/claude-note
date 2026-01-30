@@ -381,7 +381,7 @@ ps aux | grep "claude-note worker"
 
 ```bash
 # Install qmd
-# See: https://github.com/amir-arad/qmd
+# See: https://github.com/tobi/qmd
 
 # Verify installation
 which qmd

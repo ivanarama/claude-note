@@ -1,6 +1,6 @@
 # QMD Integration
 
-Claude Note integrates with [qmd](https://github.com/amir-arad/qmd) for semantic search, dramatically improving synthesis quality and note routing.
+Claude Note integrates with [qmd](https://github.com/tobi/qmd) for semantic search, dramatically improving synthesis quality and note routing.
 
 ## What is QMD?
 
