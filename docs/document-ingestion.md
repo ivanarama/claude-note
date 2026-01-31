@@ -2,6 +2,40 @@
 
 Claude Note can ingest external documents (research papers, documentation, technical specs) and convert them into structured literature notes in your vault.
 
+## Two Ways to Ingest
+
+| Method | When to Use |
+|--------|-------------|
+| `/ingest` skill | Interactive use in Claude Code sessions |
+| `claude-note ingest` CLI | Batch processing, automation, scripts |
+
+### Using /ingest Skill (Recommended for single documents)
+
+In any Claude Code session:
+```
+/ingest ~/Downloads/paper.pdf
+/ingest https://example.com/article --internal
+/ingest spec.docx --title "API Specification v2"
+```
+
+The skill uses Claude directly to extract knowledge - no separate API call needed.
+
+### Using CLI (For batch/automation)
+
+```bash
+# Process multiple files
+for f in ~/papers/*.pdf; do
+    claude-note ingest "$f"
+done
+
+# Ingest with options
+claude-note ingest report.pdf --title "Q4 Review" --dry-run
+```
+
+The CLI calls the Claude API programmatically and is better for processing multiple documents or scripted workflows.
+
+---
+
 ## Overview
 
 ```

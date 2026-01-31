@@ -53,7 +53,7 @@ echo
 # Preflight Checks
 # =============================================================================
 
-echo -e "${BLUE}[1/7]${NC} Checking requirements..."
+echo -e "${BLUE}[1/8]${NC} Checking requirements..."
 
 # Check for uv
 if command -v uv &>/dev/null; then
@@ -121,7 +121,7 @@ fi
 # =============================================================================
 
 echo
-echo -e "${BLUE}[2/7]${NC} Configuring vault..."
+echo -e "${BLUE}[2/8]${NC} Configuring vault..."
 
 # Check for existing config
 if [[ -f "${CONFIG_DIR}/config.toml" ]]; then
@@ -170,7 +170,7 @@ echo -e "  ${GREEN}✓${NC} Vault: $VAULT_PATH"
 # =============================================================================
 
 echo
-echo -e "${BLUE}[3/7]${NC} Installing claude-note with uv..."
+echo -e "${BLUE}[3/8]${NC} Installing claude-note with uv..."
 
 # Ensure Python 3.11+ is available via uv
 echo "  Ensuring Python 3.11 is available..."
@@ -218,7 +218,7 @@ CLAUDE_NOTE_BIN=$(command -v claude-note 2>/dev/null || echo "${HOME}/.local/bin
 # =============================================================================
 
 echo
-echo -e "${BLUE}[4/7]${NC} Setting up vault templates..."
+echo -e "${BLUE}[4/8]${NC} Setting up vault templates..."
 
 TEMPLATE_DIR="${SCRIPT_DIR}/vault-template"
 if [[ -d "$TEMPLATE_DIR" ]]; then
@@ -259,7 +259,7 @@ fi
 # =============================================================================
 
 echo
-echo -e "${BLUE}[5/7]${NC} Writing configuration..."
+echo -e "${BLUE}[5/8]${NC} Writing configuration..."
 
 mkdir -p "$CONFIG_DIR"
 
@@ -297,7 +297,7 @@ echo -e "  ${GREEN}✓${NC} Config at ${CONFIG_DIR}/config.toml"
 # =============================================================================
 
 echo
-echo -e "${BLUE}[6/7]${NC} Initializing vault structure..."
+echo -e "${BLUE}[6/8]${NC} Initializing vault structure..."
 
 # Create .claude-note directories
 mkdir -p "${VAULT_PATH}/.claude-note/queue"
@@ -311,7 +311,7 @@ echo -e "  ${GREEN}✓${NC} Created .claude-note/ directories"
 # =============================================================================
 
 echo
-echo -e "${BLUE}[7/7]${NC} Setting up background worker..."
+echo -e "${BLUE}[7/8]${NC} Setting up background worker..."
 
 if [[ "$OS_TYPE" == "macos" ]]; then
     # macOS launchd setup
@@ -393,6 +393,24 @@ EOF
 else
     echo -e "  ${YELLOW}!${NC} Unknown OS - skipping service setup"
     echo "  Run manually: claude-note worker"
+fi
+
+# =============================================================================
+# Install Claude Code Skills
+# =============================================================================
+
+echo
+echo -e "${BLUE}[8/8]${NC} Installing Claude Code skills..."
+
+SKILLS_DIR="${HOME}/.claude/skills"
+mkdir -p "${SKILLS_DIR}"
+
+# Copy ingest skill if available
+if [[ -d "${SCRIPT_DIR}/skills/ingest" ]]; then
+    cp -r "${SCRIPT_DIR}/skills/ingest" "${SKILLS_DIR}/"
+    echo -e "  ${GREEN}✓${NC} Installed /ingest skill"
+else
+    echo "  (no local skills available)"
 fi
 
 # =============================================================================

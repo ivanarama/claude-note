@@ -100,10 +100,24 @@ else
 fi
 
 # ============================================================================
-# Step 4: Ask about config
+# Step 4: Remove Claude Code skills
 # ============================================================================
 echo ""
-echo "Step 4: Configuration cleanup..."
+echo "Step 4: Removing Claude Code skills..."
+
+SKILLS_DIR="$HOME/.claude/skills/ingest"
+if [ -d "$SKILLS_DIR" ]; then
+    rm -rf "$SKILLS_DIR"
+    echo -e "  ${GREEN}✓ Removed /ingest skill${NC}"
+else
+    echo "  No skills found"
+fi
+
+# ============================================================================
+# Step 5: Ask about config
+# ============================================================================
+echo ""
+echo "Step 5: Configuration cleanup..."
 
 CONFIG_DIR="$HOME/.config/claude-note"
 if [ -d "$CONFIG_DIR" ]; then
