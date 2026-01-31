@@ -2,10 +2,10 @@
 #
 # Claude Note Installer
 #
-# Installs claude-note for session logging with Claude Code.
+# Installs claude-note using uv for session logging with Claude Code.
 #
 # Usage:
-#   curl -sSL https://raw.githubusercontent.com/YOU/claude-note/main/install.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/artemiin/claude-note/main/install.sh | bash
 #   # or
 #   ./install.sh
 #
@@ -20,10 +20,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Installation paths
-INSTALL_DIR="${HOME}/.local/share/claude-note"
-BIN_DIR="${HOME}/.local/bin"
 CONFIG_DIR="${HOME}/.config/claude-note"
-REPO_URL="https://github.com/YOU/claude-note.git"  # Update with actual repo
+REPO_URL="https://github.com/artemiin/claude-note.git"
 
 # Detect OS
 OS="$(uname -s)"
@@ -57,33 +55,39 @@ echo
 
 echo -e "${BLUE}[1/7]${NC} Checking requirements..."
 
-# Find Python 3.11+ (check versioned commands first, then generic python3)
-PYTHON_CMD=""
-for cmd in python3.13 python3.12 python3.11 python3; do
-    if command -v "$cmd" &>/dev/null; then
-        version=$("$cmd" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "0.0")
-        major=$(echo "$version" | cut -d. -f1)
-        minor=$(echo "$version" | cut -d. -f2)
-        if [[ "$major" -ge 3 ]] && [[ "$minor" -ge 11 ]]; then
-            PYTHON_CMD="$cmd"
-            PYTHON_VERSION="$version"
-            break
-        fi
-    fi
-done
-
-if [[ -z "$PYTHON_CMD" ]]; then
-    echo -e "${RED}Error: Python 3.11+ required${NC}"
-    echo "Please install Python 3.11 or newer."
+# Check for uv
+if command -v uv &>/dev/null; then
+    UV_VERSION=$(uv --version 2>/dev/null | head -1)
+    echo -e "  ${GREEN}✓${NC} uv found ($UV_VERSION)"
+else
+    echo -e "  ${YELLOW}!${NC} uv not found"
+    echo "    uv is required for installation."
     echo
-    if [[ "$OS_TYPE" == "macos" ]]; then
-        echo "On macOS: brew install python@3.11"
+    read -p "    Install uv now? [Y/n] " INSTALL_UV
+    if [[ -z "$INSTALL_UV" || "$INSTALL_UV" =~ ^[Yy] ]]; then
+        echo "    Installing uv..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        # Source the updated PATH
+        export PATH="${HOME}/.local/bin:${HOME}/.cargo/bin:$PATH"
+        if command -v uv &>/dev/null; then
+            echo -e "  ${GREEN}✓${NC} uv installed successfully"
+        else
+            echo -e "${RED}Error: uv installation failed${NC}"
+            echo "Please install uv manually: https://docs.astral.sh/uv/getting-started/installation/"
+            exit 1
+        fi
     else
-        echo "On Linux: Check your package manager or https://python.org"
+        echo "Please install uv first: https://docs.astral.sh/uv/getting-started/installation/"
+        exit 1
     fi
+fi
+
+# Check git
+if ! command -v git &>/dev/null; then
+    echo -e "${RED}Error: git is required${NC}"
     exit 1
 fi
-echo -e "  ${GREEN}✓${NC} Python $PYTHON_VERSION ($PYTHON_CMD)"
+echo -e "  ${GREEN}✓${NC} git found"
 
 # Check Claude CLI (warn but continue)
 if command -v claude &>/dev/null; then
@@ -94,13 +98,6 @@ else
     echo "    Install from: https://claude.ai/download"
     CLAUDE_AVAILABLE=false
 fi
-
-# Check git
-if ! command -v git &>/dev/null; then
-    echo -e "${RED}Error: git is required${NC}"
-    exit 1
-fi
-echo -e "  ${GREEN}✓${NC} git found"
 
 # Check qmd (optional but recommended)
 if command -v qmd &>/dev/null; then
@@ -140,8 +137,16 @@ fi
 
 # Prompt for vault path if not set
 if [[ -z "$VAULT_PATH" ]]; then
-    echo "  Enter the path to your Obsidian vault (or notes directory):"
-    read -p "  Vault path: " VAULT_PATH
+    DEFAULT_VAULT="${HOME}/Documents/claude-notes"
+    echo "  Enter the path to your Obsidian vault or notes directory."
+    echo "  Press Enter to create a new folder at: ${DEFAULT_VAULT}"
+    echo
+    read -p "  Vault path [${DEFAULT_VAULT}]: " VAULT_PATH
+
+    # Use default if empty
+    if [[ -z "$VAULT_PATH" ]]; then
+        VAULT_PATH="$DEFAULT_VAULT"
+    fi
 
     # Expand ~ to home directory
     VAULT_PATH="${VAULT_PATH/#\~/$HOME}"
@@ -161,80 +166,92 @@ fi
 echo -e "  ${GREEN}✓${NC} Vault: $VAULT_PATH"
 
 # =============================================================================
-# Install Source Code
+# Install with uv
 # =============================================================================
 
 echo
-echo -e "${BLUE}[3/7]${NC} Installing claude-note..."
+echo -e "${BLUE}[3/7]${NC} Installing claude-note with uv..."
 
-# Create install directory
-mkdir -p "$INSTALL_DIR"
+# Ensure Python 3.11+ is available via uv
+echo "  Ensuring Python 3.11 is available..."
+uv python install 3.11 --quiet 2>/dev/null || true
 
-# Clone or update repo
-if [[ -d "${INSTALL_DIR}/.git" ]]; then
-    echo "  Updating existing installation..."
-    cd "$INSTALL_DIR"
-    git pull --quiet
+# Check if we're running from the repo itself
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -f "${SCRIPT_DIR}/pyproject.toml" ]]; then
+    # Install from local directory
+    echo "  Installing from local directory..."
+    uv tool install "${SCRIPT_DIR}" --python 3.11 --force --quiet
 else
-    # Check if we're running from the repo itself
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [[ -f "${SCRIPT_DIR}/src/claude_note/cli.py" ]]; then
-        echo "  Copying from local directory..."
-        cp -r "${SCRIPT_DIR}"/* "$INSTALL_DIR/"
+    # Clone and install from repo
+    echo "  Cloning repository..."
+    TEMP_DIR=$(mktemp -d)
+    trap "rm -rf ${TEMP_DIR}" EXIT
+    git clone --quiet --depth 1 "$REPO_URL" "${TEMP_DIR}/claude-note"
+
+    echo "  Installing..."
+    uv tool install "${TEMP_DIR}/claude-note" --python 3.11 --force --quiet
+fi
+
+# Verify installation
+if command -v claude-note &>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} claude-note installed successfully"
+else
+    # uv tool bin directory might not be in PATH yet
+    UV_TOOL_BIN="${HOME}/.local/bin"
+    if [[ -f "${UV_TOOL_BIN}/claude-note" ]]; then
+        echo -e "  ${GREEN}✓${NC} claude-note installed to ${UV_TOOL_BIN}"
+        echo -e "  ${YELLOW}!${NC} Add ${UV_TOOL_BIN} to your PATH:"
+        echo "    export PATH=\"\$PATH:${UV_TOOL_BIN}\""
     else
-        echo "  Cloning repository..."
-        git clone --quiet "$REPO_URL" "$INSTALL_DIR"
+        echo -e "${RED}Error: Installation failed${NC}"
+        exit 1
     fi
 fi
 
-echo -e "  ${GREEN}✓${NC} Installed to $INSTALL_DIR"
+# Get the actual binary path for service configuration
+CLAUDE_NOTE_BIN=$(command -v claude-note 2>/dev/null || echo "${HOME}/.local/bin/claude-note")
 
 # =============================================================================
-# Create CLI Shim
+# Copy vault templates (if installing from local repo)
 # =============================================================================
 
 echo
-echo -e "${BLUE}[4/7]${NC} Creating CLI shim..."
+echo -e "${BLUE}[4/7]${NC} Setting up vault templates..."
 
-mkdir -p "$BIN_DIR"
+TEMPLATE_DIR="${SCRIPT_DIR}/vault-template"
+if [[ -d "$TEMPLATE_DIR" ]]; then
+    read -p "  Copy starter templates to vault? [Y/n] " COPY_TEMPLATES
+    if [[ -z "$COPY_TEMPLATES" || "$COPY_TEMPLATES" =~ ^[Yy] ]]; then
+        # Copy CLAUDE.md if it doesn't exist
+        if [[ ! -f "${VAULT_PATH}/CLAUDE.md" ]]; then
+            cp "${TEMPLATE_DIR}/CLAUDE.md" "${VAULT_PATH}/"
+            echo -e "  ${GREEN}✓${NC} Created CLAUDE.md"
+        fi
 
-# Get full path to Python for launchd/systemd compatibility
-PYTHON_FULL_PATH=$(command -v "$PYTHON_CMD")
+        # Copy inbox if it doesn't exist
+        if [[ ! -f "${VAULT_PATH}/claude-note-inbox.md" ]]; then
+            cp "${TEMPLATE_DIR}/claude-note-inbox.md" "${VAULT_PATH}/"
+            echo -e "  ${GREEN}✓${NC} Created claude-note-inbox.md"
+        fi
 
-cat > "${BIN_DIR}/claude-note" << SHIM
-#!/usr/bin/env bash
-# Claude Note CLI shim
-INSTALL_DIR="\${HOME}/.local/share/claude-note"
-export PYTHONPATH="\${INSTALL_DIR}/src"
+        # Copy open-questions.md if it doesn't exist
+        if [[ ! -f "${VAULT_PATH}/open-questions.md" ]]; then
+            cp "${TEMPLATE_DIR}/open-questions.md" "${VAULT_PATH}/"
+            echo -e "  ${GREEN}✓${NC} Created open-questions.md"
+        fi
 
-# Only read stdin if it's piped (not a terminal)
-if [ -t 0 ]; then
-    exec ${PYTHON_FULL_PATH} -m claude_note.cli "\$@"
+        # Copy templates directory
+        if [[ ! -d "${VAULT_PATH}/templates" ]]; then
+            cp -r "${TEMPLATE_DIR}/templates" "${VAULT_PATH}/"
+            echo -e "  ${GREEN}✓${NC} Created templates/"
+        fi
+    else
+        echo "  Skipping templates"
+    fi
 else
-    exec ${PYTHON_FULL_PATH} -m claude_note.cli "\$@" <<< "\$(cat)"
-fi
-SHIM
-
-# Make it executable
-chmod +x "${BIN_DIR}/claude-note"
-
-# Create Python-importable entry point
-cat > "${INSTALL_DIR}/src/claude_note/__main__.py" << 'MAIN'
-#!/usr/bin/env python3
-"""Entry point for python -m claude_note."""
-from .cli import main
-import sys
-
-if __name__ == "__main__":
-    sys.exit(main())
-MAIN
-
-echo -e "  ${GREEN}✓${NC} CLI at ${BIN_DIR}/claude-note"
-
-# Check if BIN_DIR is in PATH
-if [[ ":$PATH:" != *":${BIN_DIR}:"* ]]; then
-    echo -e "  ${YELLOW}!${NC} Add ${BIN_DIR} to your PATH:"
-    echo "    export PATH=\"\$PATH:${BIN_DIR}\""
+    echo "  (no local templates available)"
 fi
 
 # =============================================================================
@@ -289,45 +306,12 @@ mkdir -p "${VAULT_PATH}/.claude-note/logs"
 
 echo -e "  ${GREEN}✓${NC} Created .claude-note/ directories"
 
-# Optionally copy template files
-TEMPLATE_DIR="${INSTALL_DIR}/vault-template"
-if [[ -d "$TEMPLATE_DIR" ]]; then
-    read -p "  Copy starter templates to vault? [Y/n] " COPY_TEMPLATES
-    if [[ -z "$COPY_TEMPLATES" || "$COPY_TEMPLATES" =~ ^[Yy] ]]; then
-        # Copy CLAUDE.md if it doesn't exist
-        if [[ ! -f "${VAULT_PATH}/CLAUDE.md" ]]; then
-            cp "${TEMPLATE_DIR}/CLAUDE.md" "${VAULT_PATH}/"
-            echo -e "  ${GREEN}✓${NC} Created CLAUDE.md"
-        fi
-
-        # Copy inbox if it doesn't exist
-        if [[ ! -f "${VAULT_PATH}/claude-note-inbox.md" ]]; then
-            cp "${TEMPLATE_DIR}/claude-note-inbox.md" "${VAULT_PATH}/"
-            echo -e "  ${GREEN}✓${NC} Created claude-note-inbox.md"
-        fi
-
-        # Copy open-questions.md if it doesn't exist
-        if [[ ! -f "${VAULT_PATH}/open-questions.md" ]]; then
-            cp "${TEMPLATE_DIR}/open-questions.md" "${VAULT_PATH}/"
-            echo -e "  ${GREEN}✓${NC} Created open-questions.md"
-        fi
-
-        # Copy templates directory
-        if [[ ! -d "${VAULT_PATH}/templates" ]]; then
-            cp -r "${TEMPLATE_DIR}/templates" "${VAULT_PATH}/"
-            echo -e "  ${GREEN}✓${NC} Created templates/"
-        fi
-    fi
-fi
-
 # =============================================================================
 # Setup Service
 # =============================================================================
 
 echo
 echo -e "${BLUE}[7/7]${NC} Setting up background worker..."
-
-SERVICE_DIR="${INSTALL_DIR}/service"
 
 if [[ "$OS_TYPE" == "macos" ]]; then
     # macOS launchd setup
@@ -345,7 +329,7 @@ if [[ "$OS_TYPE" == "macos" ]]; then
     <string>${PLIST_NAME}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>${BIN_DIR}/claude-note</string>
+        <string>${CLAUDE_NOTE_BIN}</string>
         <string>worker</string>
     </array>
     <key>RunAtLoad</key>
@@ -358,10 +342,8 @@ if [[ "$OS_TYPE" == "macos" ]]; then
     <string>${VAULT_PATH}/.claude-note/logs/worker-stderr.log</string>
     <key>EnvironmentVariables</key>
     <dict>
-        <key>PYTHONPATH</key>
-        <string>${INSTALL_DIR}/src</string>
         <key>PATH</key>
-        <string>${BIN_DIR}:${HOME}/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <string>${HOME}/.local/bin:${HOME}/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>
 </dict>
 </plist>
@@ -389,10 +371,10 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=${BIN_DIR}/claude-note worker
+ExecStart=${CLAUDE_NOTE_BIN} worker
 Restart=always
 RestartSec=5
-Environment=PYTHONPATH=${INSTALL_DIR}/src
+Environment=PATH=${HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin
 
 [Install]
 WantedBy=default.target
@@ -442,6 +424,4 @@ echo "   claude-note status"
 echo
 echo "3. View logs:"
 echo "   tail -f ${VAULT_PATH}/.claude-note/logs/worker-*.log"
-echo
-echo "Documentation: ${INSTALL_DIR}/docs/"
 echo
