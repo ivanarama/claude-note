@@ -14,25 +14,17 @@ A Claude Code skill that turns documents (PDF, DOCX, URLs) into atomic, intercon
 
 ### Claude Code (recommended)
 
-```bash
-claude /install crimeacs/claude-ingest-skill
+Add the marketplace and install:
+```
+/plugin marketplace add crimeacs/claude-ingest-skill
+/plugin install ingest@crimeacs-claude-ingest-skill
 ```
 
-Or add to your project's `.claude/settings.json`:
-
-```json
-{
-  "skills": ["crimeacs/claude-ingest-skill"]
-}
+Or use the interactive plugin manager:
 ```
-
-### Agent Skills (openskills)
-
-Works with Cursor, Windsurf, and other AI coding tools:
-
-```bash
-npx openskills install crimeacs/claude-ingest-skill
+/plugin
 ```
+Then navigate to **Marketplaces** → Add `crimeacs/claude-ingest-skill`
 
 ### Manual Installation
 
