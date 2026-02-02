@@ -2,8 +2,8 @@
   "name": "ingest",
   "description": "Turn documents into atomic knowledge notes with semantic deduplication",
   "version": "1.0.0",
-  "author": "artemiin",
-  "repository": "https://github.com/artemiin/claude-ingest-skill",
+  "author": "crimeacs",
+  "repository": "https://github.com/crimeacs/claude-ingest-skill",
   "keywords": [
     "knowledge-management",
     "obsidian",

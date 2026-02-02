@@ -51,10 +51,10 @@ claude-note --version
 Install if needed:
 ```bash
 # Using uv (recommended)
-uv tool install git+https://github.com/artemiin/claude-note.git
+uv tool install git+https://github.com/crimeacs/claude-note.git
 
 # Or using pipx
-pipx install git+https://github.com/artemiin/claude-note.git
+pipx install git+https://github.com/crimeacs/claude-note.git
 ```
 
 **Without CLI**: The skill still works for basic ingestion using built-in tools (pdftotext, pandoc), but advanced features like semantic deduplication require the CLI.

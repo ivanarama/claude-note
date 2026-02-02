@@ -15,14 +15,14 @@ A Claude Code skill that turns documents (PDF, DOCX, URLs) into atomic, intercon
 ### Claude Code (recommended)
 
 ```bash
-claude /install artemiin/claude-ingest-skill
+claude /install crimeacs/claude-ingest-skill
 ```
 
 Or add to your project's `.claude/settings.json`:
 
 ```json
 {
-  "skills": ["artemiin/claude-ingest-skill"]
+  "skills": ["crimeacs/claude-ingest-skill"]
 }
 ```
 
@@ -31,7 +31,7 @@ Or add to your project's `.claude/settings.json`:
 Works with Cursor, Windsurf, and other AI coding tools:
 
 ```bash
-npx openskills install artemiin/claude-ingest-skill
+npx openskills install crimeacs/claude-ingest-skill
 ```
 
 ### Manual Installation
@@ -39,7 +39,7 @@ npx openskills install artemiin/claude-ingest-skill
 Clone to your skills directory:
 
 ```bash
-git clone https://github.com/artemiin/claude-ingest-skill.git ~/.claude/skills/ingest
+git clone https://github.com/crimeacs/claude-ingest-skill.git ~/.claude/skills/ingest
 ```
 
 ## Usage
@@ -71,10 +71,10 @@ For full functionality (semantic deduplication, batch processing), install the `
 
 ```bash
 # Using uv (recommended)
-uv tool install git+https://github.com/artemiin/claude-note.git
+uv tool install git+https://github.com/crimeacs/claude-note.git
 
 # Or using pipx
-pipx install git+https://github.com/artemiin/claude-note.git
+pipx install git+https://github.com/crimeacs/claude-note.git
 ```
 
 Configure your vault:
@@ -160,7 +160,7 @@ vault_root = "~/Documents/my-vault"
 
 ## Related Projects
 
-- [claude-note](https://github.com/artemiin/claude-note) - Full knowledge synthesis daemon
+- [claude-note](https://github.com/crimeacs/claude-note) - Full knowledge synthesis daemon
 - [Obsidian](https://obsidian.md) - Knowledge base that works on local Markdown files
 
 ## License
