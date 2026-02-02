@@ -263,6 +263,33 @@ def cmd_ingest(args) -> int:
     return ingest.main(args)
 
 
+def _restart_worker() -> bool:
+    """Restart the worker daemon. Returns True if successful."""
+    import platform
+
+    system = platform.system()
+
+    if system == "Darwin":
+        # macOS - use launchctl
+        import os
+        uid = os.getuid()
+        result = subprocess.run(
+            ["launchctl", "kickstart", "-k", f"gui/{uid}/com.claude-note.worker"],
+            capture_output=True
+        )
+        return result.returncode == 0
+
+    elif system == "Linux":
+        # Linux - use systemctl
+        result = subprocess.run(
+            ["systemctl", "--user", "restart", "claude-note"],
+            capture_output=True
+        )
+        return result.returncode == 0
+
+    return False
+
+
 def cmd_update(args) -> int:
     """Handle update command - check and apply updates."""
     from . import version_checker
@@ -289,8 +316,15 @@ def cmd_update(args) -> int:
     )
 
     if result.returncode == 0:
-        print("\nUpdate complete! Restart the worker to use the new version:")
-        print("  launchctl kickstart -k gui/$(id -u)/com.claude-note.worker")
+        print("\nUpdate complete!")
+
+        if not getattr(args, "no_restart", False):
+            print("Restarting worker...")
+            if _restart_worker():
+                print("Worker restarted.")
+            else:
+                print("Could not restart worker automatically.")
+                print("Restart manually with: launchctl kickstart -k gui/$(id -u)/com.claude-note.worker")
 
     return result.returncode
 
@@ -332,6 +366,9 @@ def main() -> int:
 
     # update command
     update_parser = subparsers.add_parser("update", help="Check for and apply updates")
+    update_parser.add_argument(
+        "--no-restart", action="store_true", help="Don't restart worker after update"
+    )
     update_parser.set_defaults(func=cmd_update)
 
     # resynth command
