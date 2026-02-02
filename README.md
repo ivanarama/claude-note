@@ -68,6 +68,7 @@ Claude Code Session
 
 ```bash
 claude-note status       # Check worker and queue status
+claude-note update       # Check for and apply updates
 claude-note drain        # Process all pending sessions now
 claude-note clean        # Cleanup duplicate sessions, old locks
 claude-note index        # Rebuild vault index for synthesis context
