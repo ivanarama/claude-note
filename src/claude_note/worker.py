@@ -21,6 +21,7 @@ from . import open_questions
 from . import synthesizer
 from . import note_router
 from . import vault_indexer
+from . import version_checker
 
 
 # Global flag for graceful shutdown
@@ -268,6 +269,12 @@ def run_worker(foreground: bool = False, verbose: bool = False) -> int:
     """
     logger = setup_logging(verbose=verbose or foreground)
     logger.info("Worker starting")
+
+    # Check for updates (non-blocking)
+    try:
+        version_checker.check_for_update(logger)
+    except Exception:
+        pass  # Never let version check break worker
 
     # Set up signal handlers
     signal.signal(signal.SIGTERM, handle_signal)

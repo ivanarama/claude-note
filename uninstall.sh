@@ -1,6 +1,6 @@
 #!/bin/bash
 # claude-note uninstaller
-# Removes service, CLI shim, and source files
+# Removes service and uv-installed tool
 # Does NOT remove vault data or config (user decides)
 
 set -e
@@ -55,38 +55,69 @@ else
 fi
 
 # ============================================================================
-# Step 2: Remove CLI shim
+# Step 2: Uninstall with uv
 # ============================================================================
 echo ""
-echo "Step 2: Removing CLI..."
+echo "Step 2: Removing claude-note..."
 
-CLI_PATH="$HOME/.local/bin/claude-note"
-if [ -f "$CLI_PATH" ]; then
-    rm "$CLI_PATH"
-    echo -e "  ${GREEN}✓ Removed $CLI_PATH${NC}"
+if command -v uv &>/dev/null; then
+    if uv tool list 2>/dev/null | grep -q "claude-note"; then
+        uv tool uninstall claude-note
+        echo -e "  ${GREEN}✓ Uninstalled claude-note via uv${NC}"
+    else
+        echo "  claude-note not found in uv tools"
+        # Check for legacy CLI shim
+        CLI_PATH="$HOME/.local/bin/claude-note"
+        if [ -f "$CLI_PATH" ]; then
+            rm "$CLI_PATH"
+            echo -e "  ${GREEN}✓ Removed legacy CLI at $CLI_PATH${NC}"
+        fi
+    fi
 else
-    echo "  No CLI found at $CLI_PATH"
+    echo -e "  ${YELLOW}uv not found, checking for legacy installation...${NC}"
+    # Remove legacy CLI shim if it exists
+    CLI_PATH="$HOME/.local/bin/claude-note"
+    if [ -f "$CLI_PATH" ]; then
+        rm "$CLI_PATH"
+        echo -e "  ${GREEN}✓ Removed $CLI_PATH${NC}"
+    else
+        echo "  No CLI found at $CLI_PATH"
+    fi
 fi
 
 # ============================================================================
-# Step 3: Remove source directory
+# Step 3: Remove legacy source directory (if exists from old installation)
 # ============================================================================
 echo ""
-echo "Step 3: Removing source files..."
+echo "Step 3: Cleaning up legacy files..."
 
 SRC_DIR="$HOME/.local/share/claude-note"
 if [ -d "$SRC_DIR" ]; then
     rm -rf "$SRC_DIR"
-    echo -e "  ${GREEN}✓ Removed $SRC_DIR${NC}"
+    echo -e "  ${GREEN}✓ Removed legacy source directory $SRC_DIR${NC}"
 else
-    echo "  No source directory found"
+    echo "  No legacy source directory found"
 fi
 
 # ============================================================================
-# Step 4: Ask about config
+# Step 4: Remove Claude Code skills
 # ============================================================================
 echo ""
-echo "Step 4: Configuration cleanup..."
+echo "Step 4: Removing Claude Code skills..."
+
+SKILLS_DIR="$HOME/.claude/skills/ingest"
+if [ -d "$SKILLS_DIR" ]; then
+    rm -rf "$SKILLS_DIR"
+    echo -e "  ${GREEN}✓ Removed /ingest skill${NC}"
+else
+    echo "  No skills found"
+fi
+
+# ============================================================================
+# Step 5: Ask about config
+# ============================================================================
+echo ""
+echo "Step 5: Configuration cleanup..."
 
 CONFIG_DIR="$HOME/.config/claude-note"
 if [ -d "$CONFIG_DIR" ]; then

@@ -285,6 +285,9 @@ claude-note resynth abc-123-def --model claude-opus-4-20250514 --dry-run
 
 Ingest external documents (papers, docs) as structured literature notes.
 
+> **Tip:** For single documents in Claude Code sessions, use the `/ingest` skill instead.
+> The CLI is best for batch processing or automation scripts.
+
 ```bash
 claude-note ingest <file> [options]
 ```

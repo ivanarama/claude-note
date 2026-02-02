@@ -13,10 +13,12 @@ Commands:
 """
 
 import argparse
+import subprocess
 import sys
 import time
 from datetime import datetime
 
+from . import __version__
 from . import config
 from . import queue_manager
 from . import session_tracker
@@ -44,79 +46,113 @@ def cmd_drain(args) -> int:
     return drain_module.main()
 
 
+def _format_bytes(size: int) -> str:
+    """Format bytes as human-readable string."""
+    for unit in ["B", "KB", "MB", "GB"]:
+        if size < 1024:
+            return f"{size:.1f}{unit}" if unit != "B" else f"{size}{unit}"
+        size /= 1024
+    return f"{size:.1f}TB"
+
+
+def _format_duration(seconds: float) -> str:
+    """Format seconds as human-readable duration."""
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    elif seconds < 3600:
+        return f"{int(seconds // 60)}m"
+    elif seconds < 86400:
+        return f"{int(seconds // 3600)}h"
+    else:
+        return f"{int(seconds // 86400)}d"
+
+
 def cmd_status(args) -> int:
     """Handle status command - show queue and session status."""
-    print("=== Claude Note Status ===\n")
+    from . import version_checker
 
-    # Synthesis mode
-    print(f"Synthesis mode: {config.SYNTH_MODE}")
-    print(f"Synthesis model: {config.SYNTH_MODEL}")
-    print(f"Vault root: {config.VAULT_ROOT}\n")
+    # Header with version
+    update_status = version_checker.get_update_status()
+    version_str = f"v{__version__}"
+    if update_status["update_available"]:
+        version_str += f" (update available: v{update_status['latest']})"
 
-    # Queue status
-    print("Queue files:")
+    print(f"claude-note {version_str}")
+    print("=" * 50)
+
+    # Config summary
+    print(f"\nConfig")
+    print(f"  Vault:     {config.VAULT_ROOT}")
+    print(f"  Mode:      {config.SYNTH_MODE}")
+    print(f"  Model:     {config.SYNTH_MODEL}")
+
+    # Queue summary
+    print(f"\nQueue")
+    total_events = 0
+    total_size = 0
+    queue_files = []
     if config.QUEUE_DIR.exists():
         queue_files = sorted(config.QUEUE_DIR.glob("*.jsonl"))
-        if queue_files:
-            for qf in queue_files[-5:]:  # Show last 5
-                size = qf.stat().st_size
-                print(f"  {qf.name}: {size} bytes")
-        else:
-            print("  (none)")
-    else:
-        print("  (queue directory does not exist)")
+        for qf in queue_files:
+            total_size += qf.stat().st_size
 
-    # Count events by session
-    print("\nSessions:")
+    # Count sessions and their states
     sessions: dict[str, int] = {}
     for event in queue_manager.read_all_events():
         sessions[event.session_id] = sessions.get(event.session_id, 0) + 1
+        total_events += 1
 
-    if sessions:
-        for session_id, count in sorted(sessions.items()):
-            state = session_tracker.load_session_state(session_id)
-            status = "unknown"
-            if state:
-                if state.last_write_ts:
-                    status = f"written at {state.last_write_ts[:19]}"
-                else:
-                    status = f"pending ({len(state.events)} events in state)"
-            print(f"  {session_id[:8]}: {count} queued events, {status}")
-    else:
-        print("  (none)")
+    written_count = 0
+    pending_count = 0
+    for session_id in sessions:
+        state = session_tracker.load_session_state(session_id)
+        if state and state.last_write_ts:
+            written_count += 1
+        else:
+            pending_count += 1
 
-    # State files
-    print("\nState files:")
+    print(f"  Files:     {len(queue_files)} ({_format_bytes(total_size)})")
+    print(f"  Events:    {total_events}")
+    print(f"  Sessions:  {len(sessions)} ({written_count} written, {pending_count} pending)")
+
+    # State directory
+    print(f"\nState")
     if config.STATE_DIR.exists():
         state_files = list(config.STATE_DIR.glob("*.json"))
-        print(f"  {len(state_files)} session state files")
         lock_files = list(config.STATE_DIR.glob("*.lock"))
-        print(f"  {len(lock_files)} lock files")
+        print(f"  Sessions:  {len(state_files)} state files")
+        print(f"  Locks:     {len(lock_files)} active")
     else:
-        print("  (state directory does not exist)")
+        print("  (not initialized)")
 
-    # Vault index status
-    print("\nVault index:")
+    # Vault index
+    print(f"\nVault Index")
     if config.INDEX_PATH.exists():
         index = vault_indexer.load_index()
         if index:
             age = time.time() - index.last_full_scan
-            print(f"  {len(index.notes)} notes indexed")
-            print(f"  Last scan: {int(age)}s ago")
+            print(f"  Notes:     {len(index.notes)}")
+            print(f"  Age:       {_format_duration(age)}")
         else:
-            print("  (could not load index)")
+            print("  (corrupted)")
     else:
-        print("  (not built yet)")
+        print("  (not built - run: claude-note index)")
 
-    # Inbox status
-    print("\nInbox:")
+    # Inbox
+    print(f"\nInbox")
     if config.INBOX_PATH.exists():
         entries = note_router.get_inbox_entries(limit=3)
-        print(f"  {len(entries)} recent entries")
-        for e in entries:
-            print(f"    - {e['date']}: {e['title']}")
+        if entries:
+            print(f"  Recent:")
+            for e in entries:
+                title = e['title'][:45] + "..." if len(e['title']) > 45 else e['title']
+                print(f"    {e['date']}  {title}")
+        else:
+            print("  (empty)")
     else:
         print("  (not created yet)")
+
+    print()
 
     return 0
 
@@ -227,6 +263,38 @@ def cmd_ingest(args) -> int:
     return ingest.main(args)
 
 
+def cmd_update(args) -> int:
+    """Handle update command - check and apply updates."""
+    from . import version_checker
+
+    print(f"Current version: {__version__}")
+
+    status = version_checker.get_update_status()
+
+    if status["latest"] is None:
+        print("Could not check for updates (network error)")
+        return 1
+
+    if not status["update_available"]:
+        print(f"Already on latest version ({__version__})")
+        return 0
+
+    print(f"New version available: {status['latest']}")
+    print("\nUpdating...")
+
+    result = subprocess.run(
+        ["uv", "tool", "install", "--force", "--upgrade",
+         "https://github.com/artemiin/claude-note.git"],
+        capture_output=False
+    )
+
+    if result.returncode == 0:
+        print("\nUpdate complete! Restart the worker to use the new version:")
+        print("  launchctl kickstart -k gui/$(id -u)/com.claude-note.worker")
+
+    return result.returncode
+
+
 def main() -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -261,6 +329,10 @@ def main() -> int:
     # status command
     status_parser = subparsers.add_parser("status", help="Show queue/session status")
     status_parser.set_defaults(func=cmd_status)
+
+    # update command
+    update_parser = subparsers.add_parser("update", help="Check for and apply updates")
+    update_parser.set_defaults(func=cmd_update)
 
     # resynth command
     resynth_parser = subparsers.add_parser(
