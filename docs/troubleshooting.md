@@ -518,7 +518,7 @@ If you're still stuck:
 1. **Check logs:** `.claude-note/logs/worker-*.log`
 2. **Run status:** `claude-note status` (or `python -m claude_note status` on Windows)
 3. **Test manually:** `claude-note drain --dry-run --verbose`
-4. **Open an issue:** https://github.com/crimeacs/claude-note/issues
+4. **Open an issue:** https://github.com/ivanarama/claude-note/issues
 
 Include:
 - OS and version (macOS/Linux/Windows 10/11)

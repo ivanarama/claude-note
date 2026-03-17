@@ -157,7 +157,7 @@ cat ~/vault/.claude-note/logs/launchd-stderr.log
 ```ini
 [Unit]
 Description=Claude Note Background Worker
-Documentation=https://github.com/crimeacs/claude-note
+Documentation=https://github.com/ivanarama/claude-note
 After=network.target
 
 [Service]

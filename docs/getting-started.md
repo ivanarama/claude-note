@@ -30,7 +30,7 @@ When you work with Claude Code, valuable insights emerge: debugging techniques, 
 ### One-Command Install (macOS / Linux)
 
 ```bash
-git clone https://github.com/crimeacs/claude-note.git
+git clone https://github.com/ivanarama/claude-note.git
 cd claude-note
 ./install.sh
 ```
@@ -39,7 +39,7 @@ cd claude-note
 
 ```powershell
 # 1. Clone repository
-git clone https://github.com/crimeacs/claude-note.git
+git clone https://github.com/ivanarama/claude-note.git
 cd claude-note
 
 # 2. Install package
@@ -79,7 +79,7 @@ If you prefer manual control:
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/crimeacs/claude-note.git ~/.local/share/claude-note
+git clone https://github.com/ivanarama/claude-note.git ~/.local/share/claude-note
 
 # 2. Create CLI shim
 mkdir -p ~/.local/bin
