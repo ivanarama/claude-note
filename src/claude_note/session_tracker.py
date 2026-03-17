@@ -1,8 +1,5 @@
 """Session state tracking with locks and debouncing."""
 
-import fcntl
-import os
-import time
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -10,6 +7,7 @@ from typing import Iterator, Optional
 
 from . import config
 from . import models
+from .file_lock import file_lock
 
 
 def get_state_file(session_id: str) -> Path:
@@ -27,36 +25,15 @@ def session_lock(session_id: str, timeout: float = None) -> Iterator[bool]:
     """
     Context manager for session locking.
 
-    Yields True if lock acquired, False if timeout.
+    Yields True if lock acquired.
     """
     if timeout is None:
         timeout = config.LOCK_TIMEOUT
 
     lock_file = get_lock_file(session_id)
-    lock_file.parent.mkdir(parents=True, exist_ok=True)
 
-    fd = None
-    acquired = False
-    start_time = time.time()
-
-    try:
-        fd = os.open(str(lock_file), os.O_WRONLY | os.O_CREAT, 0o644)
-
-        # Try to acquire lock with timeout
-        while time.time() - start_time < timeout:
-            try:
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                acquired = True
-                break
-            except BlockingIOError:
-                time.sleep(0.1)
-
-        yield acquired
-    finally:
-        if fd is not None:
-            if acquired:
-                fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
+    with file_lock(lock_file, timeout=timeout):
+        yield True
 
 
 def load_session_state(session_id: str) -> Optional[models.SessionState]:

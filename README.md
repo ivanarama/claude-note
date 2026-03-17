@@ -4,6 +4,8 @@ Automatic knowledge extraction from Claude Code sessions into your Obsidian vaul
 
 Claude Note runs as a background service, watching your Claude Code sessions and synthesizing key learnings, decisions, and questions into structured notes.
 
+**✨ Now with Windows support!** Works on macOS, Linux, and Windows 10/11.
+
 ## Features
 
 - **Session Logging**: Automatically captures Claude Code sessions as markdown notes
@@ -17,8 +19,11 @@ Claude Note runs as a background service, watching your Claude Code sessions and
 - Python 3.11+ (for built-in `tomllib`)
 - [Claude CLI](https://github.com/anthropics/claude-cli) (for knowledge synthesis)
 - An Obsidian vault (or any markdown-based notes system)
+- **Platforms**: macOS, Linux, **Windows** (10/11)
 
 ## Quick Start
+
+### macOS / Linux
 
 ```bash
 # Clone and install
@@ -27,7 +32,26 @@ cd claude-note
 ./install.sh
 ```
 
-The installer will:
+### Windows
+
+```powershell
+# Clone and install
+git clone https://github.com/crimeacs/claude-note.git
+cd claude-note
+pip install -e .
+
+# Create config
+mkdir $env:USERPROFILE\.config\claude-note
+echo 'vault_root = "C:\\path\\to\\your\\vault"' > $env:USERPROFILE\.config\claude-note\config.toml
+
+# Run worker (in foreground for testing)
+python -m claude_note worker --foreground
+
+# Or run as background service
+# Create a scheduled task or use Task Scheduler
+```
+
+The installer (macOS/Linux) will:
 1. Check dependencies
 2. Ask for your vault path
 3. Set up the background service
@@ -106,6 +130,7 @@ See [docs/configuration.md](docs/configuration.md) for full reference.
 
 Add to your Claude Code settings (`~/.claude/settings.json`):
 
+**macOS / Linux:**
 ```json
 {
   "hooks": {
@@ -127,6 +152,35 @@ Add to your Claude Code settings (`~/.claude/settings.json`):
       {
         "hooks": [
           { "type": "command", "command": "claude-note enqueue", "timeout": 5000 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Windows:**
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python -m claude_note enqueue", "timeout": 5000 }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python -m claude_note enqueue", "timeout": 5000 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python -m claude_note enqueue", "timeout": 5000 }
         ]
       }
     ]
@@ -167,6 +221,27 @@ systemctl --user start claude-note
 # Logs
 journalctl --user -u claude-note -f
 ```
+
+### Windows
+
+```powershell
+# Status
+python -m claude_note status
+
+# Run in foreground (for testing)
+python -m claude_note worker --foreground --verbose
+
+# Run in background
+Start-Process python -ArgumentList "-m claude_note worker" -WindowStyle Hidden
+
+# Stop
+Get-Process python | Where-Object {$_.MainWindowTitle -like "*claude_note*"} | Stop-Process
+
+# Logs
+Get-Content C:\path\to\vault\.claude-note\logs\worker-*.log -Tail 20 -Wait
+```
+
+For production use on Windows, consider creating a Scheduled Task or using NSSM (Non-Sucking Service Manager) to run the worker as a proper service.
 
 ## Vault Structure
 

@@ -10,16 +10,14 @@ Content here...
 <!-- claude-note:{block_id}:end -->
 """
 
-import fcntl
 import hashlib
 import os
 import re
-import time
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, Union
 
 from . import config
+from .file_lock import file_lock
 
 
 # Block markers
@@ -37,7 +35,6 @@ def _make_end_marker(block_id: str) -> str:
     return f"<!-- claude-note:{block_id}:end -->"
 
 
-@contextmanager
 def _note_lock(note_path: Path, timeout: float = 30.0):
     """
     Context manager for per-note locking.
@@ -51,31 +48,7 @@ def _note_lock(note_path: Path, timeout: float = 30.0):
     path_hash = hashlib.sha256(str(note_path).encode()).hexdigest()[:16]
     lock_file = lock_dir / f"{path_hash}.lock"
 
-    fd = None
-    acquired = False
-    start_time = time.time()
-
-    try:
-        fd = os.open(str(lock_file), os.O_WRONLY | os.O_CREAT, 0o644)
-
-        while time.time() - start_time < timeout:
-            try:
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                acquired = True
-                break
-            except BlockingIOError:
-                time.sleep(0.1)
-
-        if not acquired:
-            raise TimeoutError(f"Could not acquire lock for {note_path}")
-
-        yield
-
-    finally:
-        if fd is not None:
-            if acquired:
-                fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
+    return file_lock(lock_file, timeout=timeout)
 
 
 def _atomic_write(path: Path, content: str) -> None:

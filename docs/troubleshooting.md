@@ -6,18 +6,27 @@ Common issues and their solutions.
 
 Run this first to identify the problem:
 
+**macOS / Linux:**
 ```bash
 claude-note status
 ```
 
+**Windows:**
+```powershell
+python -m claude_note status
+```
+
 Then check logs:
 
+**macOS / Linux:**
 ```bash
-# macOS
 tail -100 ~/path/to/vault/.claude-note/logs/worker-$(date +%Y-%m-%d).log
-
-# Or all recent logs
 tail -f ~/path/to/vault/.claude-note/logs/worker-*.log
+```
+
+**Windows:**
+```powershell
+Get-Content C:\path\to\vault\.claude-note\logs\worker-*.log -Tail 100
 ```
 
 ---
@@ -448,6 +457,41 @@ journalctl --user -u claude-note --no-pager | tail -50
    # Verify ExecStart path exists
    ```
 
+### Windows: Worker not starting
+
+**Diagnosis:**
+```powershell
+# Check if worker process is running
+Get-Process python | Where-Object {$_.CommandLine -like "*claude_note*"}
+
+# Run manually to see errors
+python -m claude_note worker --foreground --verbose
+```
+
+**Common fixes:**
+
+1. **Python not in PATH:**
+   ```powershell
+   # Check Python is available
+   python --version
+
+   # Or use full path
+   C:\path\to\python.exe -m claude_note worker
+   ```
+
+2. **Config file issue:**
+   ```powershell
+   # Check config path
+   cat $env:USERPROFILE\.config\claude-note\config.toml
+
+   # Verify vault path format (double backslashes)
+   ```
+
+3. **Background service setup:**
+   - Use Task Scheduler to run worker on startup
+   - Or use NSSM (Non-Sucking Service Manager)
+   - Command: `python -m claude_note worker`
+
 ---
 
 ## Debug Mode
@@ -472,12 +516,12 @@ claude-note worker 2>&1 | tee debug.log
 If you're still stuck:
 
 1. **Check logs:** `.claude-note/logs/worker-*.log`
-2. **Run status:** `claude-note status`
+2. **Run status:** `claude-note status` (or `python -m claude_note status` on Windows)
 3. **Test manually:** `claude-note drain --dry-run --verbose`
 4. **Open an issue:** https://github.com/crimeacs/claude-note/issues
 
 Include:
-- OS and version
-- Python version (`python3 --version`)
+- OS and version (macOS/Linux/Windows 10/11)
+- Python version (`python3 --version` or `python --version`)
 - Error messages from logs
 - Output of `claude-note status`

@@ -27,13 +27,40 @@ When you work with Claude Code, valuable insights emerge: debugging techniques, 
 
 ## Installation
 
-### One-Command Install
+### One-Command Install (macOS / Linux)
 
 ```bash
 git clone https://github.com/crimeacs/claude-note.git
 cd claude-note
 ./install.sh
 ```
+
+### Windows Installation
+
+```powershell
+# 1. Clone repository
+git clone https://github.com/crimeacs/claude-note.git
+cd claude-note
+
+# 2. Install package
+pip install -e .
+
+# 3. Create config directory
+mkdir $env:USERPROFILE\.config\claude-note
+
+# 4. Create config file (replace with your vault path)
+echo 'vault_root = "C:\\Projects\\my-vault"' > $env:USERPROFILE\.config\claude-note\config.toml
+
+# 5. Start worker (foreground for testing)
+python -m claude_note worker --foreground --verbose
+
+# 6. Configure Claude Code hooks (see below)
+```
+
+**Windows Notes:**
+- Use `python -m claude_note` instead of `claude-note` command
+- Background service: Use Task Scheduler or run as a scheduled task
+- Config file uses Windows path format with double backslashes
 
 ### What the Installer Does
 
@@ -94,6 +121,7 @@ mkdir -p /path/to/your/vault/.claude-note/{queue,state,logs}
 
 Claude Note receives events from Claude Code through hooks. Add this to `~/.claude/settings.json`:
 
+**macOS / Linux:**
 ```json
 {
   "hooks": {
@@ -122,6 +150,35 @@ Claude Note receives events from Claude Code through hooks. Add this to `~/.clau
 }
 ```
 
+**Windows:**
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python -m claude_note enqueue", "timeout": 5000 }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python -m claude_note enqueue", "timeout": 5000 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python -m claude_note enqueue", "timeout": 5000 }
+        ]
+      }
+    ]
+  }
+}
+```
+
 ### What Each Hook Does
 
 | Hook | When it fires | What Claude Note does |
@@ -134,8 +191,14 @@ Claude Note receives events from Claude Code through hooks. Add this to `~/.clau
 
 ### 1. Check CLI works
 
+**macOS / Linux:**
 ```bash
 claude-note status
+```
+
+**Windows:**
+```powershell
+python -m claude_note status
 ```
 
 You should see:
@@ -157,14 +220,10 @@ launchctl list | grep claude-note
 systemctl --user status claude-note
 ```
 
-### 3. Test the pipeline
-
-```bash
-# Manually trigger an event
-echo '{"event":"test"}' | claude-note enqueue
-
-# Check it was queued
-claude-note status
+**Windows:**
+```powershell
+# Check if process is running
+Get-Process python | Where-Object {$_.CommandLine -like "*claude_note*"}
 ```
 
 ## First Session

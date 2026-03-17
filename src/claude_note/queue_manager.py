@@ -1,13 +1,20 @@
 """Queue management for claude-note events."""
 
-import fcntl
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator, Optional
 
 from . import config
 from . import models
+
+# Platform-specific file locking
+if sys.platform == "win32":
+    import msvcrt
+    _LOCK_EX = 0x1  # Exclusive lock
+else:
+    import fcntl
 
 
 def get_queue_file(date: Optional[datetime] = None) -> Path:
@@ -25,14 +32,24 @@ def enqueue_event(event: models.QueuedEvent) -> None:
 
     json_line = event.to_json() + "\n"
 
-    # Open file with append mode, using file locking for safety
-    fd = os.open(str(queue_file), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        os.write(fd, json_line.encode())
-    finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
+    # Platform-specific file locking
+    if sys.platform == "win32":
+        # Windows: Use msvcrt.locking
+        with open(queue_file, "ab") as f:
+            try:
+                msvcrt.locking(f.fileno(), _LOCK_EX, 1)  # Lock
+                f.write(json_line.encode())
+            finally:
+                msvcrt.locking(f.fileno(), _LOCK_EX, 0)  # Unlock
+    else:
+        # Unix: Use fcntl
+        fd = os.open(str(queue_file), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            os.write(fd, json_line.encode())
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
 
 
 def read_queue_files() -> Iterator[Path]:
