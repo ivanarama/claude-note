@@ -66,7 +66,7 @@ def read_events(queue_file: Path) -> Iterator[models.QueuedEvent]:
     if not queue_file.exists():
         return
 
-    with open(queue_file, "r") as f:
+    with open(queue_file, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:

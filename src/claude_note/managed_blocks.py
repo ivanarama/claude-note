@@ -55,7 +55,8 @@ def _atomic_write(path: Path, content: str) -> None:
     """Write file atomically using temp file + rename."""
     temp_path = path.with_suffix(path.suffix + ".tmp")
     temp_path.write_text(content, encoding="utf-8")
-    temp_path.rename(path)
+    # Windows: use os.replace() to overwrite existing file
+    os.replace(temp_path, path)
 
 
 def read_managed_block(note_path: Union[Path, str], block_id: str) -> Optional[str]:

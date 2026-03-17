@@ -5,6 +5,7 @@ Builds and maintains an index of vault notes for linking and context.
 """
 
 import json
+import os
 import re
 import time
 from dataclasses import dataclass, field, asdict
@@ -273,7 +274,7 @@ def load_index() -> Optional[VaultIndex]:
         return None
 
     try:
-        return VaultIndex.from_json(index_path.read_text())
+        return VaultIndex.from_json(index_path.read_text(encoding="utf-8"))
     except Exception:
         return None
 
@@ -286,8 +287,9 @@ def save_index(index: VaultIndex) -> None:
 
     # Atomic write
     temp_path = index_path.with_suffix(".tmp")
-    temp_path.write_text(index.to_json())
-    temp_path.rename(index_path)
+    temp_path.write_text(index.to_json(), encoding="utf-8")
+    # Windows: use os.replace() to overwrite existing file
+    os.replace(temp_path, index_path)
 
 
 def update_index(changed_files: list[Path] = None) -> VaultIndex:

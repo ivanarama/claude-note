@@ -54,7 +54,7 @@ def _parse_simple_toml(path: Path) -> dict:
     result: dict = {}
     current_section: Optional[dict] = None
 
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
 

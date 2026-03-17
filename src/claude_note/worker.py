@@ -7,6 +7,7 @@ Polls the queue and processes sessions when debounce expires.
 
 import argparse
 import logging
+import os
 import signal
 import sys
 import time
@@ -113,7 +114,8 @@ def update_session_summary(state: models.SessionState, pack, logger: logging.Log
         # Write atomically
         temp_path = note_path.with_suffix(".tmp")
         temp_path.write_text(new_content, encoding="utf-8")
-        temp_path.rename(note_path)
+        # Windows: use os.replace() to overwrite existing file
+        os.replace(temp_path, note_path)
 
         logger.info(f"Updated session summary: {pack.title}")
         return True

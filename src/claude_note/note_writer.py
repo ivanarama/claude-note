@@ -1,5 +1,6 @@
 """Markdown note generation for session notes."""
 
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -287,8 +288,9 @@ def write_session_note(state: models.SessionState) -> Path:
 
     # Atomic write
     temp_path = note_path.with_suffix(".tmp")
-    temp_path.write_text(content)
-    temp_path.rename(note_path)
+    temp_path.write_text(content, encoding="utf-8")
+    # Windows: use os.replace() to overwrite existing file
+    os.replace(temp_path, note_path)
 
     return note_path
 
@@ -305,7 +307,7 @@ def update_session_note(state: models.SessionState) -> Path:
         return write_session_note(state)
 
     # Read existing content
-    existing = note_path.read_text()
+    existing = note_path.read_text(encoding="utf-8")
 
     # Parse and update only the Timeline section
     # This preserves any manual edits to Summary, Decisions, etc.
@@ -350,7 +352,8 @@ def update_session_note(state: models.SessionState) -> Path:
 
     # Atomic write
     temp_path = note_path.with_suffix(".tmp")
-    temp_path.write_text(new_content)
-    temp_path.rename(note_path)
+    temp_path.write_text(new_content, encoding="utf-8")
+    # Windows: use os.replace() to overwrite existing file
+    os.replace(temp_path, note_path)
 
     return note_path

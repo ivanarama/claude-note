@@ -5,6 +5,7 @@ Applies note operations from KnowledgePack to the vault.
 """
 
 import logging
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -80,7 +81,8 @@ def create_note(
     # Atomic write
     temp_path = note_path.with_suffix(".tmp")
     temp_path.write_text(content, encoding="utf-8")
-    temp_path.rename(note_path)
+    # Windows: use os.replace() to overwrite existing file
+    os.replace(temp_path, note_path)
 
     return note_path
 

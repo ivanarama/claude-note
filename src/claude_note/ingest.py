@@ -72,7 +72,7 @@ def convert_to_text(file_path: Path) -> str:
     suffix = file_path.suffix.lower()
 
     if suffix in ['.txt', '.md']:
-        return file_path.read_text()
+        return file_path.read_text(encoding="utf-8")
 
     elif suffix == '.docx':
         # Use pandoc
@@ -456,7 +456,7 @@ def _merge_concept_sources(
         model = getattr(config, "SYNTH_MODEL", "claude-sonnet-4-5-20250929")
 
     # Read existing note
-    existing_content = existing_note.read_text()
+    existing_content = existing_note.read_text(encoding="utf-8")
 
     # Parse YAML frontmatter to check source count
     yaml_match = re.match(r'^---\n(.*?)\n---', existing_content, re.DOTALL)
@@ -609,7 +609,7 @@ def _merge_concept_sources(
 
     # Write updated content
     new_content = new_frontmatter + "\n\n" + body.strip() + "\n"
-    existing_note.write_text(new_content)
+    existing_note.write_text(new_content, encoding="utf-8")
 
     return existing_note
 
@@ -705,7 +705,7 @@ ingested: {date}
 {chr(10).join(f"- {link}" for link in related_links)}
 """
 
-    note_path.write_text(content)
+    note_path.write_text(content, encoding="utf-8")
     return note_path
 
 
@@ -820,7 +820,7 @@ added: {date}
 *Source: {source_citation}*
 """
 
-    note_path.write_text(content)
+    note_path.write_text(content, encoding="utf-8")
     return note_path
 
 

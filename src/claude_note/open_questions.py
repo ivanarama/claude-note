@@ -181,7 +181,7 @@ def append_questions_to_open_questions(state, questions: list) -> int:
     date_str = datetime.utcnow().strftime("%Y-%m-%d")
 
     # Read existing content
-    existing = config.OPEN_QUESTIONS_FILE.read_text()
+    existing = config.OPEN_QUESTIONS_FILE.read_text(encoding="utf-8")
 
     # Check which questions are already present (avoid duplicates)
     new_questions = []
@@ -209,8 +209,9 @@ def append_questions_to_open_questions(state, questions: list) -> int:
 
     # Atomic write
     temp_path = config.OPEN_QUESTIONS_FILE.with_suffix(".tmp")
-    temp_path.write_text(new_content)
-    temp_path.rename(config.OPEN_QUESTIONS_FILE)
+    temp_path.write_text(new_content, encoding="utf-8")
+    # Windows: use os.replace() to overwrite existing file
+    os.replace(temp_path, config.OPEN_QUESTIONS_FILE)
 
     return len(new_questions)
 

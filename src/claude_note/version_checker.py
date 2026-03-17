@@ -45,7 +45,7 @@ def should_check() -> bool:
     if not VERSION_CHECK_FILE.exists():
         return True
     try:
-        data = json.loads(VERSION_CHECK_FILE.read_text())
+        data = json.loads(VERSION_CHECK_FILE.read_text(encoding="utf-8"))
         last_check = datetime.fromisoformat(data.get("last_check", ""))
         return datetime.now(timezone.utc) - last_check > timedelta(hours=CHECK_INTERVAL_HOURS)
     except Exception:
@@ -67,7 +67,7 @@ def check_for_update(logger) -> bool:
     if not should_check():
         # Use cached result
         try:
-            data = json.loads(VERSION_CHECK_FILE.read_text())
+            data = json.loads(VERSION_CHECK_FILE.read_text(encoding="utf-8"))
             if data.get("update_available"):
                 logger.info(f"Update available: {__version__} -> {data.get('latest_version')} (run: claude-note update)")
             return data.get("update_available", False)

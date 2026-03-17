@@ -1,5 +1,6 @@
 """Session state tracking with locks and debouncing."""
 
+import os
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -43,7 +44,7 @@ def load_session_state(session_id: str) -> Optional[models.SessionState]:
         return None
 
     try:
-        return models.SessionState.from_json(state_file.read_text())
+        return models.SessionState.from_json(state_file.read_text(encoding="utf-8"))
     except Exception:
         return None
 
@@ -55,43 +56,57 @@ def save_session_state(state: models.SessionState) -> None:
 
     # Atomic write via temp file
     temp_file = state_file.with_suffix(".tmp")
-    temp_file.write_text(state.to_json())
-    temp_file.rename(state_file)
+    temp_file.write_text(state.to_json(), encoding="utf-8")
+    # Windows: use os.replace() to overwrite existing file
+    os.replace(temp_file, state_file)
 
 
 def is_recursive_event(event: models.QueuedEvent) -> bool:
     """Check if event is from claude-note itself (recursion prevention)."""
-    # Check cwd
-    if any(marker in event.cwd for marker in config.RECURSION_MARKERS):
+    import os
+
+    # Normalize paths for comparison
+    cwd_normalized = os.path.normpath(event.cwd).lower()
+    vault_normalized = os.path.normpath(str(config.VAULT_ROOT)).lower()
+
+    # Check if cwd is inside vault internals (claude-note working directory)
+    if cwd_normalized.startswith(vault_normalized) and ".claude-note" in cwd_normalized:
         return True
 
     # Check tool inputs in data
     data = event.data
     tool_input = data.get("tool_input", {})
 
-    # Check file paths
+    # Check file paths - only filter if inside vault internals
     file_path = tool_input.get("file_path", "")
-    if any(marker in file_path for marker in config.RECURSION_MARKERS):
-        return True
+    if file_path:
+        fp_normalized = os.path.normpath(file_path).lower()
+        if fp_normalized.startswith(vault_normalized) and ".claude-note" in fp_normalized:
+            return True
 
-    # Check bash commands
+    # Check bash commands for synthesis-specific patterns
     command = tool_input.get("command", "")
-    if any(marker in command for marker in config.RECURSION_MARKERS):
+    synthesis_indicators = ["extracting durable knowledge", "claude-note inbox"]
+    if any(indicator in command.lower() for indicator in synthesis_indicators):
         return True
 
-    # Check grep/glob patterns
+    # Check grep/glob patterns - only for synthesis-related queries
     pattern = tool_input.get("pattern", "")
-    if any(marker in pattern for marker in config.RECURSION_MARKERS):
-        return True
+    if any(marker in pattern.lower() for marker in config.RECURSION_MARKERS):
+        # Additional check: only filter if pattern looks like a synthesis query
+        if any(indicator in pattern.lower() for indicator in synthesis_indicators):
+            return True
 
-    # Check path parameter
+    # Check path parameter - only filter if inside vault internals
     path = tool_input.get("path", "")
-    if any(marker in path for marker in config.RECURSION_MARKERS):
-        return True
+    if path:
+        path_normalized = os.path.normpath(path).lower()
+        if path_normalized.startswith(vault_normalized) and ".claude-note" in path_normalized:
+            return True
 
-    # Check user prompt (for synthesis sessions)
+    # Check user prompt for synthesis markers (more specific)
     prompt = data.get("prompt", "")
-    if any(marker in prompt for marker in config.RECURSION_MARKERS):
+    if "extracting durable knowledge" in prompt.lower():
         return True
 
     return False

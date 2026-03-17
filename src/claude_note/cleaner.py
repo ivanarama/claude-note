@@ -5,6 +5,7 @@ Provides tools to clean up bloated notes, deduplicate inbox entries,
 compress session timelines, and remove orphan state files.
 """
 
+import os
 import re
 import time
 from datetime import datetime
@@ -176,7 +177,8 @@ def compress_session_timeline(note_path: Path, dry_run: bool = True) -> Optional
         # Atomic write
         temp_path = note_path.with_suffix(".tmp")
         temp_path.write_text(new_content, encoding="utf-8")
-        temp_path.rename(note_path)
+        # Windows: use os.replace() to overwrite existing file
+        os.replace(temp_path, note_path)
 
     return results
 
@@ -304,7 +306,8 @@ def dedupe_inbox(inbox_path: Path = None, similarity_threshold: float = 0.7, dry
             # Atomic write
             temp_path = inbox_path.with_suffix(".tmp")
             temp_path.write_text(new_content, encoding="utf-8")
-            temp_path.rename(inbox_path)
+            # Windows: use os.replace() to overwrite existing file
+            os.replace(temp_path, inbox_path)
 
     return results
 

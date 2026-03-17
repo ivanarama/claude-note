@@ -365,6 +365,8 @@ def synthesize_session(
             ["claude", "-p", prompt, "--model", model],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             env=env,
             timeout=timeout,
         )
