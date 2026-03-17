@@ -17,20 +17,26 @@ from . import knowledge_pack
 from . import transcript_reader
 from . import vault_indexer
 from . import qmd_search
+from . import localization
+
+
+def _get_lang() -> str:
+    """Get current language code from config."""
+    return config.LANGUAGE_CODE
 
 
 def _format_user_prompts(prompts: list[str], max_total: int = 8000) -> str:
     """Format user prompts for synthesis, with truncation."""
     if not prompts:
-        return "(No user prompts)"
+        return localization.get_label("no_user_prompts", _get_lang())
 
     formatted = []
     total_len = 0
 
     for i, prompt in enumerate(prompts, 1):
         # Truncate individual prompts
-        if len(prompt) > 500:
-            prompt = prompt[:500] + "..."
+        if len(prompt) > config.SYNTH_MAX_PROMPT_LEN:
+            prompt = prompt[:config.SYNTH_MAX_PROMPT_LEN] + "..."
 
         entry = f"{i}. {prompt}"
         if total_len + len(entry) > max_total:
@@ -43,10 +49,13 @@ def _format_user_prompts(prompts: list[str], max_total: int = 8000) -> str:
     return "\n".join(formatted)
 
 
-def _format_tool_summary(tool_uses: list, max_entries: int = 50) -> str:
+def _format_tool_summary(tool_uses: list, max_entries: int = None) -> str:
     """Format tool uses as summary."""
+    if max_entries is None:
+        max_entries = config.SYNTH_MAX_TOOL_ENTRIES
+    lang = _get_lang()
     if not tool_uses:
-        return "(No tool uses)"
+        return localization.get_label("no_tool_uses", lang)
 
     # Count by tool type
     counts = {}
@@ -54,12 +63,12 @@ def _format_tool_summary(tool_uses: list, max_entries: int = 50) -> str:
         name = tool.name if hasattr(tool, "name") else tool.get("name", "unknown")
         counts[name] = counts.get(name, 0) + 1
 
-    lines = ["Tool usage summary:"]
+    lines = [localization.get_label("tool_usage_summary", lang)]
     for name, count in sorted(counts.items(), key=lambda x: x[1], reverse=True):
         lines.append(f"  - {name}: {count} uses")
 
     # Add notable tool uses (first few of each type)
-    lines.append("\nNotable operations:")
+    lines.append(f"\n{localization.get_label('notable_operations', lang)}")
     seen_types = {}  # dict to count how many of each type we've shown
     entries = 0
 
@@ -71,7 +80,7 @@ def _format_tool_summary(tool_uses: list, max_entries: int = 50) -> str:
         tool_input = tool.input if hasattr(tool, "input") else tool.get("input", {})
 
         # Skip if we've shown enough of this type
-        if seen_types.get(name, 0) >= 3:
+        if seen_types.get(name, 0) >= config.SYNTH_MAX_TOOL_EXAMPLES_PER_TYPE:
             continue
 
         # Format based on tool type
@@ -103,10 +112,13 @@ def _format_tool_summary(tool_uses: list, max_entries: int = 50) -> str:
     return "\n".join(lines)
 
 
-def _format_files_list(files: list[str], max_files: int = 30) -> str:
+def _format_files_list(files: list[str], max_files: int = None) -> str:
     """Format list of files touched."""
+    if max_files is None:
+        max_files = config.SYNTH_MAX_FILES_SHOWN
+    lang = _get_lang()
     if not files:
-        return "(No files touched)"
+        return localization.get_label("no_files_touched", lang)
 
     if len(files) <= max_files:
         return "\n".join(f"  - {f}" for f in files)
@@ -117,10 +129,11 @@ def _format_files_list(files: list[str], max_files: int = 30) -> str:
 
 def _format_vault_summary(vault_index: vault_indexer.VaultIndex) -> str:
     """Format vault index summary for context."""
+    lang = _get_lang()
     if not vault_index or not vault_index.notes:
-        return "(No vault notes indexed)"
+        return localization.get_label("no_vault_notes", lang)
 
-    lines = [f"Vault has {len(vault_index.notes)} notes."]
+    lines = [localization.get_label("vault_has_notes", lang).format(count=len(vault_index.notes))]
 
     # Get all tags
     all_tags = set()
@@ -128,11 +141,11 @@ def _format_vault_summary(vault_index: vault_indexer.VaultIndex) -> str:
         all_tags.update(note.tags)
 
     if all_tags:
-        lines.append(f"Available tags: {', '.join(sorted(all_tags))}")
+        lines.append(f"{localization.get_label('available_tags', lang)} {', '.join(sorted(all_tags))}")
 
     # List ALL note names so LLM knows what exists (critical for routing)
     note_names = sorted([Path(n.path).stem for n in vault_index.notes.values()])
-    lines.append(f"Existing notes: {', '.join(note_names)}")
+    lines.append(f"{localization.get_label('existing_notes', lang)} {', '.join(note_names)}")
 
     return "\n".join(lines)
 
@@ -151,13 +164,14 @@ def _get_related_note_snippets(transcript: transcript_reader.TranscriptContent, 
     Returns:
         Formatted string with related note snippets, or fallback message
     """
+    lang = _get_lang()
     # Check if qmd synthesis is enabled
     if not config.QMD_SYNTH_ENABLED:
-        return "(Semantic search disabled)"
+        return localization.get_label("semantic_search_disabled", lang)
 
     try:
         if not qmd_search.is_qmd_available():
-            return "(qmd not available - using note names only)"
+            return localization.get_label("qmd_not_available", lang)
 
         # Build query from user prompts and file names
         query_parts = []
@@ -177,7 +191,7 @@ def _get_related_note_snippets(transcript: transcript_reader.TranscriptContent, 
                 query_parts.append(stem.replace("-", " ").replace("_", " "))
 
         if not query_parts:
-            return "(No query context from session)"
+            return localization.get_label("no_query_context", lang)
 
         query = " ".join(query_parts)
         min_score = config.QMD_MIN_SCORE
@@ -186,10 +200,10 @@ def _get_related_note_snippets(transcript: transcript_reader.TranscriptContent, 
         results = qmd_search.search_vector(query, limit=max_notes, min_score=min_score)
 
         if not results:
-            return "(No semantically related notes found)"
+            return localization.get_label("no_related_notes", lang)
 
         # Format results with snippets
-        lines = [f"Found {len(results)} related notes:"]
+        lines = [localization.get_label("found_related_notes", lang).format(count=len(results))]
 
         for r in results:
             note_name = Path(r.path).stem
@@ -229,6 +243,7 @@ def build_synthesis_prompt(
     Returns:
         Complete prompt string
     """
+    lang = _get_lang()
     if not date:
         date = datetime.utcnow().strftime("%Y-%m-%d")
 
@@ -236,64 +251,29 @@ def build_synthesis_prompt(
     tool_summary = _format_tool_summary(transcript.tool_uses)
     files_list = _format_files_list(transcript.files_touched)
     vault_summary = _format_vault_summary(vault_index)
-    schema = knowledge_pack.get_schema_description()
+    schema = knowledge_pack.get_schema_description(lang)
 
     # Get semantically related notes for better context
     max_related = config.QMD_SYNTH_MAX_NOTES
     related_context = _get_related_note_snippets(transcript, vault_index, max_notes=max_related)
 
-    prompt = f"""You are extracting durable knowledge from a Claude Code session.
+    # Format errors
+    errors = "\n".join(transcript.errors) if transcript.errors else localization.get_label("no_errors", lang)
 
-## Session Context
-Working directory: {cwd or "unknown"}
-Date: {date}
-Session ID: {transcript.session_id}
-
-## User Prompts
-{user_prompts}
-
-## Key Tool Uses
-{tool_summary}
-
-## Files Touched
-{files_list}
-
-## Errors Encountered
-{chr(10).join(transcript.errors) if transcript.errors else "(None)"}
-
-## Related Notes (semantic matches)
-{related_context}
-
-## Existing Vault Notes (for linking)
-{vault_summary}
-
-## Your Task
-
-Extract knowledge into this exact JSON schema:
-{schema}
-
-## Rules
-
-1. **Only extract genuinely durable knowledge** - things that would be useful in 1 week
-2. **CRITICAL - Check existing notes:** The list above shows ALL notes in the vault. Before generating a note_op:
-   - If a note with that name already exists → use "upsert_block" (NEVER "create")
-   - Only use "create" for topics that have NO existing note
-3. **Use existing tags from the vault** when they fit
-4. **Keep summaries concise** (2-4 sentences for concepts)
-5. **For note_ops:**
-   - "upsert_block": Updates existing note with a managed block. Use managed_block_id like "synth-findings" or "synth-howto"
-   - "create": Only for genuinely NEW topics with no existing note
-   - "append": Add to a section in existing note (use sparingly)
-6. **Don't extract:**
-   - Trivial file reads/writes with no learning
-   - Debugging steps that didn't lead anywhere
-   - Information that's already well-documented elsewhere
-7. **If the session was trivial** (just navigation, simple fixes), return empty note_ops
-
-Return ONLY valid JSON matching the schema. No markdown, no explanation, just the JSON object.
-"""
-
-    return prompt
+    # Use localized prompt builder
+    return localization.format_synthesis_prompt(
+        lang=lang,
+        cwd=cwd or localization.get_label("unknown", lang),
+        date=date,
+        session_id=transcript.session_id,
+        user_prompts=user_prompts,
+        tool_summary=tool_summary,
+        files_list=files_list,
+        errors=errors,
+        related_context=related_context,
+        vault_summary=vault_summary,
+        schema=schema,
+    )
 
 
 def parse_knowledge_pack(output: str) -> knowledge_pack.KnowledgePack:

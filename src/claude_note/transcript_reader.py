@@ -29,6 +29,8 @@ class TranscriptContent:
     files_touched: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     thinking_snippets: list[str] = field(default_factory=list)
+    plan: Optional[str] = None  # Plan content from plan mode
+    summary: Optional[str] = None  # Summary of session/plan
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -48,6 +50,8 @@ class TranscriptContent:
             "files_touched": self.files_touched,
             "errors": self.errors,
             "thinking_snippets": self.thinking_snippets,
+            "plan": self.plan,
+            "summary": self.summary,
         }
 
 
@@ -122,6 +126,8 @@ def read_transcript(transcript_path: Union[str, Path]) -> TranscriptContent:
     content = TranscriptContent(session_id=session_id)
     files_seen = set()
     current_tool_uses = {}  # Track tool uses by id for matching with results
+    plan_sections = []  # Collect potential plan sections
+    summary_sections = []  # Collect potential summary sections
 
     with open(transcript_path, "r", encoding="utf-8") as f:
         for line in f:
@@ -191,13 +197,18 @@ def read_transcript(transcript_path: Union[str, Path]) -> TranscriptContent:
                                     content.files_touched.append(path)
                                     files_seen.add(path)
 
-                        # Thinking blocks
+                        # Thinking blocks - may contain plan
                         elif block_type == "thinking":
                             thinking = block.get("thinking", "")
                             if thinking.strip():
                                 # Only keep first 500 chars of each thinking block
                                 snippet = thinking.strip()[:500]
                                 content.thinking_snippets.append(snippet)
+
+                                # Check if thinking contains plan-related content
+                                thinking_lower = thinking.lower()
+                                if any(keyword in thinking_lower for keyword in ["plan:", "## plan", "implementation plan", "steps:"]):
+                                    plan_sections.append(thinking.strip())
 
             # Handle tool results (progress messages)
             elif entry_type == "progress":
@@ -240,6 +251,40 @@ def read_transcript(transcript_path: Union[str, Path]) -> TranscriptContent:
                         tool_use.output_summary = _summarize_tool_output(
                             tool_use.name, content_data
                         )
+
+            # Check for special events that might contain plan/summary
+            elif entry_type in ("enter_plan_mode", "exit_plan_mode"):
+                # These events might have additional data
+                if "data" in entry:
+                    data = entry.get("data", {})
+                    if isinstance(data, dict):
+                        if entry_type == "enter_plan_mode":
+                            plan_content = data.get("plan") or data.get("content")
+                            if plan_content:
+                                plan_sections.append(str(plan_content))
+                        elif entry_type == "exit_plan_mode":
+                            summary_content = data.get("summary") or data.get("content")
+                            if summary_content:
+                                summary_sections.append(str(summary_content))
+
+    # Extract plan from collected sections (join if multiple)
+    if plan_sections:
+        # Take the longest plan section as it's likely the most complete
+        content.plan = max(plan_sections, key=len)
+
+    # Extract summary from collected sections or from last assistant message
+    if summary_sections:
+        content.summary = max(summary_sections, key=len)
+    elif content.assistant_texts:
+        # Try to extract summary from the last assistant text
+        last_text = content.assistant_texts[-1]
+        # Look for summary patterns
+        for marker in ["## Summary", "**Summary**", "Summary:", "Итого:", "## Итог"]:
+            if marker in last_text:
+                parts = last_text.split(marker)
+                if len(parts) > 1:
+                    content.summary = parts[-1].strip()
+                    break
 
     return content
 

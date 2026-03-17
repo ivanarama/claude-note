@@ -13,6 +13,8 @@ Claude Note runs as a background service, watching your Claude Code sessions and
 - **Smart Routing**: Routes synthesized knowledge to your inbox, specific notes, or creates new ones
 - **Open Questions Tracking**: Detects and tracks questions that come up during sessions
 - **Vault Integration**: Understands your existing notes for better context
+- **Multilingual**: Synthesis prompts and UI in English and Russian
+- **Prompts Archive**: Optionally saves all user prompts to a dedicated Obsidian note
 
 ## Requirements
 
@@ -98,6 +100,7 @@ claude-note clean        # Cleanup duplicate sessions, old locks
 claude-note index        # Rebuild vault index for synthesis context
 claude-note resynth <id> # Re-synthesize a specific session
 claude-note ingest <file> # Ingest PDF/DOCX into literature notes
+claude-note prompts      # Show prompts archive stats
 ```
 
 ## Configuration
@@ -113,6 +116,14 @@ open_questions_file = "open-questions.md"  # relative to vault
 [synthesis]
 mode = "route"           # log | inbox | route
 model = "claude-sonnet-4-5-20250929"
+
+[language]
+code = "en"              # en | ru
+
+[prompts_archive]
+enabled = false          # Save user prompts to a dedicated note
+file = "prompts-archive.md"
+include_plan_summary = true
 
 [qmd]
 enabled = false          # Enable qmd semantic search for context
@@ -278,6 +289,12 @@ synth_max_notes = 5  # Include top N relevant notes as context
 ```
 
 This improves synthesis quality by providing relevant vault context.
+
+## Testing
+
+```bash
+python -m pytest tests/ -v
+```
 
 ## Documentation
 

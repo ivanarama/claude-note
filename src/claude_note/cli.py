@@ -10,6 +10,7 @@ Commands:
     resynth   - Re-run synthesis for a session
     index     - Rebuild vault index
     clean     - Daily cleanup operations
+    prompts   - Show prompts archive status
 """
 
 import argparse
@@ -29,6 +30,7 @@ from . import enqueue as enqueue_module
 from . import worker as worker_module
 from . import drain as drain_module
 from . import synthesizer
+from . import prompts_archive
 
 
 def cmd_enqueue(args) -> int:
@@ -263,6 +265,38 @@ def cmd_ingest(args) -> int:
     return ingest.main(args)
 
 
+def cmd_prompts(args) -> int:
+    """Handle prompts command - show prompts archive status."""
+    stats = prompts_archive.get_archive_stats()
+
+    print("Claude Code Prompts Archive")
+    print("=" * 50)
+
+    print(f"\nStatus:    {'enabled' if stats['enabled'] else 'disabled'}")
+    print(f"Location: {stats['path']}")
+
+    if not stats['exists']:
+        print("\nArchive does not exist yet.")
+        if stats['enabled']:
+            print("It will be created when the first session is synthesized.")
+        return 0
+
+    print(f"\nEntries:   {stats['entry_count']}")
+    print(f"Prompts:   {stats['total_prompts']}")
+
+    if stats['last_updated']:
+        print(f"Last:      {stats['last_updated']}")
+
+    if stats['recent_entries']:
+        print("\nRecent entries:")
+        for entry in stats['recent_entries']:
+            timestamp = entry['timestamp'][:19]  # Truncate session ID
+            print(f"  {timestamp} ({entry['prompt_count']} prompts)")
+
+    print()
+    return 0
+
+
 def _restart_worker() -> bool:
     """Restart the worker daemon. Returns True if successful."""
     import platform
@@ -449,6 +483,12 @@ def main() -> int:
         help="Internal mode: create int-* notes in internal/ (default: lit-* in literature/)"
     )
     ingest_parser.set_defaults(func=cmd_ingest)
+
+    # prompts command
+    prompts_parser = subparsers.add_parser(
+        "prompts", help="Show prompts archive status"
+    )
+    prompts_parser.set_defaults(func=cmd_prompts)
 
     args = parser.parse_args()
 

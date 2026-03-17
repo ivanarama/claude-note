@@ -8,6 +8,9 @@ import json
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
+from . import config
+from . import localization
+
 
 @dataclass
 class Concept:
@@ -154,60 +157,22 @@ class KnowledgePack:
         )
 
 
-def get_schema_description() -> str:
+def get_schema_description(lang: Optional[str] = None) -> str:
     """
     Get a human-readable description of the KnowledgePack schema.
 
     Used in synthesis prompts.
+
+    Args:
+        lang: Optional language code. If not provided, uses config.LANGUAGE_CODE
+
+    Returns:
+        Schema description in the specified language
     """
-    return """
-{
-    "session_id": "string - session identifier",
-    "date": "string - ISO date (YYYY-MM-DD)",
-    "time": "string - time (HH:MM:SS), optional",
-    "title": "string - human-readable session title (5-10 words)",
-    "highlights": ["string - 1-3 key outcomes of the session"],
-    "concepts": [
-        {
-            "name": "string - concept name",
-            "summary": "string - 2-4 sentence explanation",
-            "tags": ["string - relevant tags from vault"],
-            "links_suggested": ["string - note names to link to"]
-        }
-    ],
-    "decisions": [
-        {
-            "decision": "string - what was decided",
-            "rationale": "string - why this decision",
-            "evidence": ["string - supporting facts"]
-        }
-    ],
-    "open_questions": [
-        {
-            "question": "string - the question",
-            "context": "string - why this matters",
-            "suggested_next_step": "string - how to investigate"
-        }
-    ],
-    "howtos": [
-        {
-            "title": "string - procedure title",
-            "steps": ["string - step-by-step instructions"],
-            "gotchas": ["string - pitfalls to avoid"]
-        }
-    ],
-    "note_ops": [
-        {
-            "op": "create | upsert_block | append",
-            "path": "string - note filename (e.g., 'my-note.md')",
-            "frontmatter": {"tags": [...], ...},  // for create only
-            "body_markdown": "string - content to write",
-            "managed_block_id": "string",  // for upsert_block only
-            "section": "string"  // for append only (e.g., '## Synthesized')
-        }
-    ]
-}
-""".strip()
+    if lang is None:
+        lang = config.LANGUAGE_CODE
+
+    return localization.get_schema_description(lang)
 
 
 def validate_knowledge_pack(pack: KnowledgePack) -> list[str]:

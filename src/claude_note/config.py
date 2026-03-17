@@ -216,6 +216,34 @@ INDEX_REFRESH_INTERVAL = int(_get_config_value("index_refresh_interval", default
 SYNTH_MODEL = _get_config_value("model", section="synthesis", default="claude-sonnet-4-5-20250929")
 SYNTH_MAX_TOKENS = int(_get_config_value("max_tokens", section="synthesis", default=4096))
 SYNTH_TIMEOUT = int(_get_config_value("timeout", section="synthesis", default=120))
+SYNTH_MAX_PROMPT_LEN = int(_get_config_value("max_prompt_len", section="synthesis", default=500))
+SYNTH_MAX_TOOL_EXAMPLES_PER_TYPE = int(_get_config_value("max_tool_examples_per_type", section="synthesis", default=3))
+SYNTH_MAX_TOOL_ENTRIES = int(_get_config_value("max_tool_entries", section="synthesis", default=50))
+SYNTH_MAX_FILES_SHOWN = int(_get_config_value("max_files_shown", section="synthesis", default=30))
+
+# =============================================================================
+# Language Configuration
+# =============================================================================
+
+_language_code = _get_config_value("code", section="language", default="en")
+SUPPORTED_LANGUAGES = ["en", "ru"]
+# Validate and fallback to "en" if unsupported
+if _language_code not in SUPPORTED_LANGUAGES and _language_code != "en":
+    print(
+        f"Warning: unsupported language '{_language_code}', falling back to 'en'. "
+        f"Supported: {', '.join(SUPPORTED_LANGUAGES)}",
+        file=sys.stderr,
+    )
+LANGUAGE_CODE = _language_code if _language_code in SUPPORTED_LANGUAGES else "en"
+
+# =============================================================================
+# Prompts Archive Configuration
+# =============================================================================
+
+PROMPTS_ARCHIVE_ENABLED = _get_config_value("enabled", section="prompts_archive", default=False)
+_prompts_file = _get_config_value("file", section="prompts_archive", default="prompts-archive.md")
+PROMPTS_ARCHIVE_PATH = VAULT_ROOT / _prompts_file
+PROMPTS_ARCHIVE_INCLUDE_PLAN_SUMMARY = _get_config_value("include_plan_summary", section="prompts_archive", default=True)
 
 # =============================================================================
 # Cleanup Configuration
@@ -266,4 +294,7 @@ def get_config_summary() -> dict:
         "synth_model": SYNTH_MODEL,
         "open_questions_file": str(OPEN_QUESTIONS_FILE),
         "qmd_enabled": QMD_SYNTH_ENABLED,
+        "language_code": LANGUAGE_CODE,
+        "prompts_archive_enabled": PROMPTS_ARCHIVE_ENABLED,
+        "prompts_archive_path": str(PROMPTS_ARCHIVE_PATH),
     }
