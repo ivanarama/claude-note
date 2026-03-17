@@ -27,7 +27,7 @@ Claude Note runs as a background service, watching your Claude Code sessions and
 
 ```bash
 # Clone and install
-git clone https://github.com/crimeacs/claude-note.git
+git clone https://github.com/ivanarama/claude-note.git
 cd claude-note
 ./install.sh
 ```
@@ -36,7 +36,7 @@ cd claude-note
 
 ```powershell
 # Clone and install
-git clone https://github.com/crimeacs/claude-note.git
+git clone https://github.com/ivanarama/claude-note.git
 cd claude-note
 pip install -e .
 
