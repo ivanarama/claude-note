@@ -82,6 +82,95 @@ This note archives all user prompts from Claude Code sessions.
         return False
 
 
+def _is_synthesis_prompt(prompt: str, cwd: str) -> bool:
+    """
+    Check if a prompt is a synthesis system prompt (not a real user prompt).
+
+    Args:
+        prompt: The prompt text to check
+        cwd: Working directory during session
+
+    Returns:
+        True if this is a synthesis system prompt that should be excluded
+    """
+    # Check for synthesis markers first
+    synthesis_markers = [
+        "Вы извлекаете устойчивые знания из сессии",
+        "Extract durable knowledge from a Claude Code session",
+        "## Контекст сессии",
+        "## Your task",
+        "note_ops",
+        '"session_id":',
+    ]
+
+    prompt_lower = prompt.lower()
+    for marker in synthesis_markers:
+        if marker.lower() in prompt_lower:
+            return True
+
+    # Don't use cwd as a filter - it's too aggressive
+    # A user might legitimately work in their vault directory
+    return False
+
+
+def _is_duplicate_entry(prompts: list[str], archive_path: Path, check_last_n: int = 10) -> bool:
+    """
+    Check if the given prompts already exist in recent archive entries.
+
+    Args:
+        prompts: List of prompts to check
+        archive_path: Path to the archive file
+        check_last_n: Number of recent entries to check (default: 10)
+
+    Returns:
+        True if this is a duplicate of a recent entry
+    """
+    if not archive_path.exists():
+        return False
+
+    try:
+        content = archive_path.read_text(encoding="utf-8")
+
+        # Get recent entries (last check_last_n)
+        entries = content.split('### ')
+        if len(entries) <= 1:  # Only header, no entries
+            return False
+
+        # Check only the last N entries (excluding header at index 0)
+        recent_entries = entries[-check_last_n:] if len(entries) > check_last_n else entries[1:]
+
+        for entry in recent_entries:
+            # Extract User Prompts section
+            if '**User Prompts:**' not in entry:
+                continue
+
+            prompts_section = entry.split('**User Prompts:**')[1].split('---')[0]
+
+            # Extract prompts from this entry
+            entry_prompts = []
+            for line in prompts_section.split('\n'):
+                line = line.strip()
+                if re.match(r'^\d+\.\s', line):
+                    # Extract the prompt text (remove the number)
+                    entry_prompts.append(line.split('. ', 1)[1] if '. ' in line else line)
+
+            # Compare prompts
+            if len(entry_prompts) == len(prompts):
+                all_match = True
+                for ep, p in zip(entry_prompts, prompts):
+                    if ep.strip() != p.strip():
+                        all_match = False
+                        break
+                if all_match:
+                    return True
+
+        return False
+
+    except Exception as e:
+        logger.debug(f"Error checking for duplicates: {e}")
+        return False
+
+
 def append_prompts_to_archive(
     session_id: str,
     cwd: str,
@@ -111,10 +200,21 @@ def append_prompts_to_archive(
         logger.warning(f"Prompts archive path is outside vault root, skipping: {get_prompts_archive_path()}")
         return False
 
-    if not user_prompts and not plan and not summary:
-        return False  # Nothing to archive
+    # Filter out synthesis system prompts
+    filtered_prompts = [
+        p for p in user_prompts
+        if not _is_synthesis_prompt(p, cwd)
+    ]
+
+    if not filtered_prompts and not plan and not summary:
+        return False  # Nothing to archive after filtering
 
     if not _ensure_archive_exists():
+        return False
+
+    # Check for duplicates in recent entries
+    if _is_duplicate_entry(filtered_prompts, archive_path):
+        logger.debug(f"Skipping duplicate entry for session {session_id[:16]}")
         return False
 
     archive_path = get_prompts_archive_path()
@@ -141,11 +241,11 @@ def append_prompts_to_archive(
             lines.append("```")
             lines.append("")
 
-        # Add user prompts
-        if user_prompts:
+        # Add user prompts (filtered)
+        if filtered_prompts:
             lines.append("**User Prompts:**")
             lines.append("")
-            for i, prompt in enumerate(user_prompts, 1):
+            for i, prompt in enumerate(filtered_prompts, 1):
                 lines.append(f"{i}. {prompt}")
             lines.append("")
 

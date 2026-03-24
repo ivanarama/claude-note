@@ -43,7 +43,7 @@ class QueuedEvent:
 
     def to_json(self) -> str:
         """Serialize to JSON string."""
-        return json.dumps(asdict(self))
+        return json.dumps(asdict(self), ensure_ascii=False)
 
     @classmethod
     def from_json(cls, json_str: str) -> "QueuedEvent":
@@ -66,7 +66,7 @@ class SessionState:
 
     def to_json(self) -> str:
         """Serialize to JSON string."""
-        return json.dumps(asdict(self), indent=2)
+        return json.dumps(asdict(self), indent=2, ensure_ascii=False)
 
     @classmethod
     def from_json(cls, json_str: str) -> "SessionState":

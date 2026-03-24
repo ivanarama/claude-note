@@ -336,9 +336,9 @@ def synthesize_session(
     prompt = build_synthesis_prompt(transcript, vault_index, cwd=cwd, date=date)
 
     # Call claude CLI in print mode
-    # Disable hooks to prevent recursion
+    # Set marker so enqueue.py skips events from synthesis sessions
     env = os.environ.copy()
-    env["CLAUDE_CODE_HOOKS_ENABLED"] = "false"
+    env["CLAUDE_NOTE_SYNTHESIS"] = "1"
 
     try:
         result = subprocess.run(

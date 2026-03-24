@@ -128,3 +128,57 @@ def cleanup_old_queue_files(keep_days: int = 7) -> None:
         except ValueError:
             # Skip files that don't match the date pattern
             continue
+
+
+def remove_event_ids(event_ids: set[str]) -> int:
+    """
+    Remove processed events from queue files.
+
+    Args:
+        event_ids: Set of event IDs to remove
+
+    Returns:
+        Number of events removed
+    """
+    if not event_ids:
+        return 0
+
+    removed = 0
+
+    for queue_file in read_queue_files():
+        if not queue_file.exists():
+            continue
+
+        # Read all lines, filter out processed events
+        lines_to_keep = []
+        lines_removed = 0
+
+        with open(queue_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+
+                try:
+                    event = models.QueuedEvent.from_json(line)
+                    if event.event_id in event_ids:
+                        lines_removed += 1
+                    else:
+                        lines_to_keep.append(line)
+                except Exception:
+                    # Keep malformed lines
+                    lines_to_keep.append(line)
+
+        if lines_removed > 0:
+            # Write back only unprocessed events
+            queue_file.parent.mkdir(parents=True, exist_ok=True)
+            temp_file = queue_file.with_suffix(".tmp")
+            temp_file.write_text("\n".join(lines_to_keep) + "\n", encoding="utf-8")
+            os.replace(temp_file, queue_file)
+            removed += lines_removed
+
+        # Remove empty queue files
+        if queue_file.exists() and queue_file.stat().st_size == 0:
+            queue_file.unlink()
+
+    return removed

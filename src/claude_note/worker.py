@@ -269,17 +269,31 @@ def poll_once(logger: logging.Logger) -> int:
 
     Returns number of notes written.
     """
-    # Group events by session
+    # Group events by session and track all event IDs
     sessions: dict[str, list] = {}
+    session_event_ids: dict[str, set] = {}
+
     for event in queue_manager.read_all_events():
         if event.session_id not in sessions:
             sessions[event.session_id] = []
+            session_event_ids[event.session_id] = set()
         sessions[event.session_id].append(event)
+        session_event_ids[event.session_id].add(event.event_id)
 
     notes_written = 0
+    events_to_remove: set = set()
+
     for session_id, events in sessions.items():
         if process_session(session_id, events, logger):
             notes_written += 1
+            # Mark session's events for removal after successful write
+            events_to_remove.update(session_event_ids[session_id])
+
+    # Remove processed events from queue
+    if events_to_remove:
+        removed = queue_manager.remove_event_ids(events_to_remove)
+        if removed > 0:
+            logger.debug(f"Removed {removed} processed events from queue")
 
     return notes_written
 

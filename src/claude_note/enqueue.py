@@ -7,6 +7,7 @@ Must be FAST - exits immediately, even on errors.
 """
 
 import json
+import os
 import sys
 
 from . import models
@@ -16,8 +17,12 @@ from . import queue_manager
 def main() -> int:
     """Main entry point for enqueue command."""
     try:
-        # Read JSON from stdin
-        raw_input = sys.stdin.read()
+        # Skip if running inside synthesizer (prevents recursive loop)
+        if os.environ.get("CLAUDE_NOTE_SYNTHESIS") == "1":
+            return 0
+
+        # Read JSON from stdin (use binary buffer to ensure UTF-8 on Windows)
+        raw_input = sys.stdin.buffer.read().decode("utf-8")
         if not raw_input.strip():
             # No input is fine, just exit
             return 0
