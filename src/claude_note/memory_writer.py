@@ -559,7 +559,7 @@ def update_memory(
     with _memory_lock(memory_path):
         temp_path = memory_path.with_suffix(".tmp")
         temp_path.write_text(new_content, encoding="utf-8")
-        temp_path.rename(memory_path)
+        os.replace(temp_path, memory_path)  # atomic on Windows, unlike Path.rename()
 
     result["memory_updated"] = True
     result["entries_added"] = added
