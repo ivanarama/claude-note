@@ -14,7 +14,8 @@ Claude Note runs as a background service, watching your Claude Code sessions and
 - **Open Questions Tracking**: Detects and tracks questions that come up during sessions
 - **Vault Integration**: Understands your existing notes for better context
 - **Multilingual**: Synthesis prompts and UI in English and Russian
-- **Prompts Archive**: Optionally saves all user prompts to a dedicated Obsidian note
+- **Prompts Archive**: Saves all user prompts to a dedicated Obsidian note
+- **Auto-Memory**: After each session, updates `MEMORY.md` in your Claude Code project directory with durable knowledge (decisions, patterns, gotchas, how-tos)
 
 ## Requirements
 
@@ -93,14 +94,16 @@ Claude Code Session
 ## Commands
 
 ```bash
-claude-note status       # Check worker and queue status
-claude-note update       # Check for and apply updates
-claude-note drain        # Process all pending sessions now
-claude-note clean        # Cleanup duplicate sessions, old locks
-claude-note index        # Rebuild vault index for synthesis context
-claude-note resynth <id> # Re-synthesize a specific session
-claude-note ingest <file> # Ingest PDF/DOCX into literature notes
-claude-note prompts      # Show prompts archive stats
+claude-note status                      # Check worker and queue status
+claude-note update                      # Check for and apply updates
+claude-note drain                       # Process all pending sessions now
+claude-note clean                       # Cleanup duplicate sessions, old locks
+claude-note index                       # Rebuild vault index for synthesis context
+claude-note resynth <id>                # Re-synthesize a session (also updates memory)
+claude-note resynth <id> --memory-only  # Only update memory, skip note ops
+claude-note ingest <file>               # Ingest PDF/DOCX into literature notes
+claude-note prompts                     # Show prompts archive stats
+claude-note backfill-prompts            # Backfill prompts archive from past sessions
 ```
 
 ## Configuration
@@ -121,9 +124,16 @@ model = "claude-sonnet-4-5-20250929"
 code = "en"              # en | ru
 
 [prompts_archive]
-enabled = false          # Save user prompts to a dedicated note
+enabled = true           # Save user prompts to a dedicated note
 file = "prompts-archive.md"
 include_plan_summary = true
+
+[memory]
+enabled = true           # Update MEMORY.md in Claude Code project dir after each session
+# model = "claude-z:glm-4.7"  # Override model for memory curation (default: uses synthesis models)
+max_lines = 190          # Budget for MEMORY.md
+stale_days = 90          # Remove entries older than N days when over budget
+dedup_threshold = 0.6    # Similarity threshold for deduplication (0.0–1.0)
 
 [qmd]
 enabled = false          # Enable qmd semantic search for context
@@ -269,6 +279,72 @@ your-vault/
 ├── open-questions.md       # Questions tracker
 └── claude-session-*.md     # Session logs (optional)
 ```
+
+## Auto-Memory
+
+After each session ends, claude-note calls Claude to curate project-specific knowledge into `MEMORY.md` inside your Claude Code project directory:
+
+```
+~/.claude/projects/{project}/memory/MEMORY.md
+```
+
+This file is automatically loaded into future Claude Code sessions as context. It contains:
+
+```markdown
+## Decisions
+- Use stdin instead of -p flag for Claude CLI on Windows (2026-03-27)
+
+## Patterns
+- Always resolve .bat/.cmd paths with shutil.which on Windows (2026-03-27)
+
+## Gotchas
+- archive_path must be defined before _is_duplicate_entry call (2026-03-27)
+
+## How-tos
+- Backfill missed prompts: python -m claude_note backfill-prompts --since YYYY-MM-DD (2026-03-27)
+```
+
+Memory entries are automatically deduplicated and pruned when they exceed the line budget.
+
+### Backfilling missed sessions
+
+If sessions were missed (e.g. due to a bug), restore them without re-running synthesis:
+
+```bash
+# Dry-run first
+python -m claude_note backfill-prompts --since 2026-03-25 --dry-run
+
+# Apply
+python -m claude_note backfill-prompts --since 2026-03-25
+```
+
+To also update memory from past sessions (uses Claude):
+
+```bash
+python -m claude_note resynth <session-id> --memory-only
+```
+
+### Verifying it works
+
+After closing a Claude Code session:
+
+1. **Worker log** — look for synthesis and memory lines:
+   ```
+   [INFO] Synthesizing session abc12345...
+   [INFO] Memory: +2/-0 entries
+   [DEBUG] Archived 5 items (prompts, plan, summary)
+   ```
+
+2. **Memory file** — check entries were added:
+   ```bash
+   # Windows
+   type %USERPROFILE%\.claude\projects\{project-dir}\memory\MEMORY.md
+   ```
+
+3. **Prompts archive** — check last entry date:
+   ```bash
+   python -m claude_note prompts
+   ```
 
 ## Uninstall
 

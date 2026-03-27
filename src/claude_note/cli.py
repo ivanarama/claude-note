@@ -167,8 +167,13 @@ def cmd_status(args) -> int:
 
 def cmd_resynth(args) -> int:
     """Handle resynth command - re-run synthesis for a session."""
+    import logging
+    from . import session_tracker
+    from . import memory_writer
+
     session_id = args.session_id
     model = args.model
+    memory_only = getattr(args, "memory_only", False)  # argparse converts --memory-only -> memory_only
 
     print(f"Re-synthesizing session {session_id[:8]}...")
     if model:
@@ -190,22 +195,44 @@ def cmd_resynth(args) -> int:
         print(f"  How-tos: {len(pack.howtos)}")
         print(f"  Note ops: {len(pack.note_ops)}")
 
-        # Apply based on mode (or use explicit mode from args)
-        mode = args.mode if args.mode else config.SYNTH_MODE
-        if mode == "log":
-            mode = "inbox"  # For resynth, at least write to inbox
+        if not memory_only:
+            # Apply based on mode (or use explicit mode from args)
+            mode = args.mode if args.mode else config.SYNTH_MODE
+            if mode == "log":
+                mode = "inbox"  # For resynth, at least write to inbox
 
-        print(f"\nApplying with mode: {mode}")
-        results = note_router.apply_note_ops(pack, mode=mode)
+            print(f"\nApplying with mode: {mode}")
+            results = note_router.apply_note_ops(pack, mode=mode)
 
-        if results["inbox_updated"]:
-            print("  Updated inbox")
-        if results["notes_created"]:
-            print(f"  Created: {', '.join(results['notes_created'])}")
-        if results["notes_updated"]:
-            print(f"  Updated: {', '.join(results['notes_updated'])}")
-        if results["errors"]:
-            print(f"  Errors: {', '.join(results['errors'])}")
+            if results["inbox_updated"]:
+                print("  Updated inbox")
+            if results["notes_created"]:
+                print(f"  Created: {', '.join(results['notes_created'])}")
+            if results["notes_updated"]:
+                print(f"  Updated: {', '.join(results['notes_updated'])}")
+            if results["errors"]:
+                print(f"  Errors: {', '.join(results['errors'])}")
+
+        # Update memory
+        if config.MEMORY_ENABLED:
+            state = session_tracker.load_session_state(session_id)
+            transcript_path = state.transcript_path if state else ""
+            cwd = state.cwd if state else ""
+            logger = logging.getLogger("claude-note")
+
+            print("\nUpdating memory...")
+            result = memory_writer.update_memory(
+                pack=pack,
+                cwd=cwd,
+                transcript_path=transcript_path,
+                logger=logger,
+            )
+            if result["memory_updated"]:
+                print(f"  Memory: +{result['entries_added']}/-{result['entries_removed']} entries")
+                if result["memory_path"]:
+                    print(f"  Path: {result['memory_path']}")
+            elif result["skip_reason"]:
+                print(f"  Memory skipped: {result['skip_reason']}")
 
         return 0
 
@@ -280,6 +307,95 @@ def cmd_web(args) -> int:
 
     print(f"Starting claude-note web server on http://{host}:{port}")
     web_api.run_server(host=host, port=port)
+    return 0
+
+
+def cmd_backfill_prompts(args) -> int:
+    """Backfill prompts archive from existing session states (no synthesis needed)."""
+    from . import session_tracker
+    from . import transcript_reader
+    from pathlib import Path
+    from datetime import datetime
+
+    since = None
+    if args.since:
+        try:
+            since = datetime.strptime(args.since, "%Y-%m-%d")
+        except ValueError:
+            print(f"Invalid date format: {args.since} (expected YYYY-MM-DD)")
+            return 1
+
+    dry_run = args.dry_run
+
+    # Collect all session state files
+    state_files = sorted(config.STATE_DIR.glob("*.json"))
+    if not state_files:
+        print("No session states found.")
+        return 0
+
+    total = 0
+    archived = 0
+    skipped = 0
+    errors = 0
+
+    for state_path in state_files:
+        session_id = state_path.stem
+
+        # Load state
+        try:
+            state = session_tracker.load_session_state(session_id)
+            if not state:
+                continue
+        except Exception:
+            continue
+
+        # Filter by date
+        if since and state.first_event_ts:
+            try:
+                ts = datetime.fromisoformat(state.first_event_ts.rstrip("Z"))
+                if ts < since:
+                    continue
+            except Exception:
+                pass
+
+        # Skip if no transcript
+        if not state.transcript_path or not Path(state.transcript_path).exists():
+            continue
+
+        total += 1
+
+        try:
+            transcript = transcript_reader.read_transcript_from_state(state)
+            if not transcript.user_prompts:
+                skipped += 1
+                continue
+
+            if dry_run:
+                print(f"  [dry-run] {session_id[:8]} — {len(transcript.user_prompts)} prompts")
+                archived += 1
+                continue
+
+            ok = prompts_archive.append_prompts_to_archive(
+                session_id=state.session_id,
+                cwd=state.cwd or "",
+                user_prompts=transcript.user_prompts,
+                plan=transcript.plan,
+                summary=transcript.summary,
+            )
+            if ok:
+                archived += 1
+                print(f"  Archived {session_id[:8]} — {len(transcript.user_prompts)} prompts")
+            else:
+                skipped += 1
+
+        except Exception as e:
+            errors += 1
+            if args.verbose:
+                print(f"  Error {session_id[:8]}: {e}")
+
+    print(f"\nDone: {archived} archived, {skipped} skipped, {errors} errors (of {total} sessions with transcripts)")
+    if dry_run:
+        print("This was a dry-run. Remove --dry-run to apply.")
     return 0
 
 
@@ -383,6 +499,12 @@ def cmd_update(args) -> int:
 
 def main() -> int:
     """Main entry point."""
+    # Fix Windows console encoding issues
+    if sys.platform == "win32":
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
     parser = argparse.ArgumentParser(
         description="Claude Note - session logging for Claude Code",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -436,6 +558,10 @@ def main() -> int:
     )
     resynth_parser.add_argument(
         "--model", help="Override model (e.g., claude-opus-4-20250514)"
+    )
+    resynth_parser.add_argument(
+        "--memory-only", action="store_true",
+        help="Only update memory, skip note ops"
     )
     resynth_parser.set_defaults(func=cmd_resynth)
 
@@ -507,6 +633,21 @@ def main() -> int:
         "prompts", help="Show prompts archive status"
     )
     prompts_parser.set_defaults(func=cmd_prompts)
+
+    # backfill-prompts command
+    backfill_parser = subparsers.add_parser(
+        "backfill-prompts", help="Backfill prompts archive from existing sessions (no synthesis)"
+    )
+    backfill_parser.add_argument(
+        "--since", "-s", help="Only process sessions since date (YYYY-MM-DD)"
+    )
+    backfill_parser.add_argument(
+        "--dry-run", "-n", action="store_true", help="Show what would be archived without writing"
+    )
+    backfill_parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Show errors"
+    )
+    backfill_parser.set_defaults(func=cmd_backfill_prompts)
 
     # web command
     web_parser = subparsers.add_parser(

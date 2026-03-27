@@ -213,12 +213,12 @@ def append_prompts_to_archive(
     if not _ensure_archive_exists():
         return False
 
+    archive_path = get_prompts_archive_path()
+
     # Check for duplicates in recent entries
     if _is_duplicate_entry(filtered_prompts, archive_path):
         logger.debug(f"Skipping duplicate entry for session {session_id[:16]}")
         return False
-
-    archive_path = get_prompts_archive_path()
 
     try:
         # Use current time if no timestamp provided

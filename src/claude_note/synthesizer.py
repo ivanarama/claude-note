@@ -7,7 +7,9 @@ Calls headless Claude to extract knowledge from transcripts.
 import json
 import os
 import re
+import shutil
 import subprocess
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -357,8 +359,18 @@ def synthesize_session(
             command = config.get_model_command(try_model_entry)
             model_name = config.get_model_name(try_model_entry)
 
+            # On Windows, resolve .bat/.cmd files to full path
+            # to avoid shell=True which can mangle arguments
+            exe_command = command
+            if sys.platform == "win32":
+                resolved = shutil.which(command)
+                if resolved and resolved.lower().endswith((".bat", ".cmd")):
+                    exe_command = resolved
+
+            # Use stdin for prompt to avoid argument escaping issues
             result = subprocess.run(
-                [command, "-p", prompt, "--model", model_name],
+                [exe_command, "--model", model_name],
+                input=prompt,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -388,7 +400,7 @@ def synthesize_session(
             return pack
 
         except subprocess.TimeoutExpired:
-            last_error = RuntimeError(f"Synthesis with {try_model} timed out after {timeout}s")
+            last_error = RuntimeError(f"Synthesis with {try_model_entry} timed out after {timeout}s")
             continue
         except FileNotFoundError:
             raise RuntimeError("Claude CLI not found. Is it installed?")

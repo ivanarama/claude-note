@@ -9,7 +9,9 @@ Claude Code sessions start with accumulated project knowledge.
 import json
 import os
 import re
+import shutil
 import subprocess
+import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -361,18 +363,35 @@ def _call_claude_for_curation(
     prompt = _build_curation_prompt(pack, current_memory)
 
     env = os.environ.copy()
-    env["CLAUDE_CODE_HOOKS_ENABLED"] = "false"
+    env["CLAUDE_NOTE_SYNTHESIS"] = "1"
+
+    # Parse command:model_name format (e.g. "claude-z:glm-4.7")
+    command = config.get_model_command(model)
+    model_name = config.get_model_name(model)
+
+    # On Windows, resolve .bat/.cmd files to full path
+    exe_command = command
+    if sys.platform == "win32":
+        resolved = shutil.which(command)
+        if resolved and resolved.lower().endswith((".bat", ".cmd")):
+            exe_command = resolved
 
     result = subprocess.run(
-        ["claude", "-p", prompt, "--model", model],
+        [exe_command, "--model", model_name],
+        input=prompt,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         env=env,
         timeout=timeout,
     )
 
     if result.returncode != 0:
         raise RuntimeError(f"Claude CLI failed: {result.stderr}")
+
+    if not result.stdout.strip():
+        raise RuntimeError(f"Claude returned empty response for memory curation (model: {model})")
 
     return _parse_curation_response(result.stdout)
 
@@ -440,14 +459,32 @@ def update_memory(
     else:
         current_memory = _bootstrap_memory(memory_path)
 
-    # Determine model
-    model = config.MEMORY_MODEL or config.SYNTH_MODEL
+    # Determine models to try (MEMORY_MODEL overrides to single model, else use SYNTH_MODELS list)
+    if config.MEMORY_MODEL:
+        models_to_try = [config.MEMORY_MODEL]
+    else:
+        models_to_try = config.SYNTH_MODELS
 
-    # Call Claude for curation
-    logger.debug(f"Memory: calling Claude for curation ({model})")
-    curation = _call_claude_for_curation(
-        pack, current_memory, model, config.MEMORY_TIMEOUT
-    )
+    # Call Claude for curation with model fallback
+    curation = None
+    last_error = None
+    for attempt, model in enumerate(models_to_try):
+        try:
+            if attempt > 0:
+                delay = config.SYNTH_MODEL_RETRY_DELAY * (2 ** (attempt - 1))
+                time.sleep(delay)
+            logger.debug(f"Memory: calling Claude for curation ({model})")
+            curation = _call_claude_for_curation(
+                pack, current_memory, model, config.MEMORY_TIMEOUT
+            )
+            break
+        except subprocess.TimeoutExpired:
+            last_error = RuntimeError(f"Memory curation timed out ({model})")
+        except Exception as e:
+            last_error = e
+
+    if curation is None:
+        raise last_error or RuntimeError("All models failed for memory curation")
 
     # Check if skipped
     if curation.get("skip_reason"):
