@@ -160,6 +160,21 @@ def run_synthesis(state: models.SessionState, logger: logging.Logger) -> bool:
         if pack and pack.model_used:
             logger.info(f"Session {state.session_id[:8]}: synthesized with {pack.model_used}")
 
+        # Archive user prompts regardless of whether knowledge was extracted
+        if prompts_archive.is_prompts_archive_enabled():
+            try:
+                transcript = transcript_reader.read_transcript_from_state(state)
+                if prompts_archive.append_prompts_to_archive(
+                    session_id=state.session_id,
+                    cwd=state.cwd,
+                    user_prompts=transcript.user_prompts,
+                    plan=transcript.plan,
+                    summary=transcript.summary,
+                ):
+                    logger.debug(f"Archived {len(transcript.user_prompts)} prompts")
+            except Exception as e:
+                logger.warning(f"Failed to archive prompts: {e}")
+
         if pack is None or pack.is_empty():
             logger.info(f"Session {state.session_id[:8]}: no knowledge extracted")
             return False
@@ -185,27 +200,6 @@ def run_synthesis(state: models.SessionState, logger: logging.Logger) -> bool:
         if results["errors"]:
             for err in results["errors"]:
                 logger.warning(f"Synthesis error: {err}")
-
-        # Archive user prompts (if enabled)
-        if prompts_archive.is_prompts_archive_enabled():
-            try:
-                transcript = transcript_reader.read_transcript_from_state(state)
-                if prompts_archive.append_prompts_to_archive(
-                    session_id=state.session_id,
-                    cwd=state.cwd,
-                    user_prompts=transcript.user_prompts,
-                    plan=transcript.plan,
-                    summary=transcript.summary,
-                ):
-                    archived_count = len(transcript.user_prompts)
-                    if transcript.plan:
-                        archived_count += 1  # Count plan as an item
-                    if transcript.summary:
-                        archived_count += 1  # Count summary as an item
-                    logger.debug(f"Archived {archived_count} items (prompts, plan, summary)")
-            except Exception as e:
-                # Don't fail synthesis if prompts archive fails
-                logger.warning(f"Failed to archive prompts: {e}")
 
         # Update auto-memory (if enabled)
         if config.MEMORY_ENABLED:
