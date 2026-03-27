@@ -9,8 +9,8 @@ from pathlib import Path
 from . import __version__
 from . import config
 
-REPO_URL = "https://github.com/artemiin/claude-note"
-RELEASES_API = "https://api.github.com/repos/artemiin/claude-note/releases/latest"
+REPO_URL = "https://github.com/ivanarama/claude-note"
+RELEASES_API = "https://api.github.com/repos/ivanarama/claude-note/releases/latest"
 CHECK_INTERVAL_HOURS = 24
 VERSION_CHECK_FILE = config.STATE_DIR / "version-check.json"
 

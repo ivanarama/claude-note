@@ -212,10 +212,75 @@ INBOX_PATH = VAULT_ROOT / _get_config_value("inbox_file", default="claude-note-i
 INDEX_PATH = STATE_DIR / "vault_index.json"
 INDEX_REFRESH_INTERVAL = int(_get_config_value("index_refresh_interval", default=300))
 
-# Synthesis model
-SYNTH_MODEL = _get_config_value("model", section="synthesis", default="claude-sonnet-4-5-20250929")
+# Synthesis models (list with fallback support)
+SYNTH_MODELS = _get_config_value("models", section="synthesis", default=None)
+if SYNTH_MODELS is None:
+    # Backward compatibility: use single model setting
+    single_model = _get_config_value("model", section="synthesis", default="claude-sonnet-4-5-20250929")
+    SYNTH_MODELS = [single_model]
+elif isinstance(SYNTH_MODELS, str):
+    SYNTH_MODELS = [SYNTH_MODELS]
+
+# Legacy single model setting (for compatibility)
+SYNTH_MODEL = SYNTH_MODELS[0] if SYNTH_MODELS else "claude-sonnet-4-5-20250929"
+
+
+# =============================================================================
+# Model/Profile Helpers
+# =============================================================================
+
+def parse_model_entry(model_entry: str) -> tuple[str, str]:
+    """
+    Parse a model entry that may contain a profile prefix.
+
+    Args:
+        model_entry: String like "claude-z:glm-4.7" or "claude-sonnet-4-5-20250929"
+
+    Returns:
+        Tuple of (profile, model_name). Profile is empty string if no prefix.
+        Examples:
+            "claude-z:glm-4.7" -> ("claude-z", "glm-4.7")
+            "claude-sonnet-4-5" -> ("", "claude-sonnet-4-5")
+    """
+    if ":" in model_entry:
+        profile, model = model_entry.split(":", 1)
+        return profile.strip(), model.strip()
+    return "", model_entry
+
+
+def get_model_command(model_entry: str) -> str:
+    """
+    Get the command to use for a model entry.
+
+    Args:
+        model_entry: String like "claude-z:glm-4.7" or "claude-sonnet-4-5-20250929"
+
+    Returns:
+        Command to use: "claude-z", "claude-k", or "claude" for default
+    """
+    profile, _ = parse_model_entry(model_entry)
+    return profile if profile else "claude"
+
+
+def get_model_name(model_entry: str) -> str:
+    """
+    Get just the model name from a model entry.
+
+    Args:
+        model_entry: String like "claude-z:glm-4.7" or "claude-sonnet-4-5-20250929"
+
+    Returns:
+        Just the model name: "glm-4.7" or "claude-sonnet-4-5-20250929"
+    """
+    _, model = parse_model_entry(model_entry)
+    return model
+
 SYNTH_MAX_TOKENS = int(_get_config_value("max_tokens", section="synthesis", default=4096))
 SYNTH_TIMEOUT = int(_get_config_value("timeout", section="synthesis", default=120))
+
+# Model fallback settings
+SYNTH_MAX_MODEL_RETRIES = int(_get_config_value("max_model_retries", section="synthesis", default=3))
+SYNTH_MODEL_RETRY_DELAY = int(_get_config_value("model_retry_delay", section="synthesis", default=5))
 SYNTH_MAX_PROMPT_LEN = int(_get_config_value("max_prompt_len", section="synthesis", default=500))
 SYNTH_MAX_TOOL_EXAMPLES_PER_TYPE = int(_get_config_value("max_tool_examples_per_type", section="synthesis", default=3))
 SYNTH_MAX_TOOL_ENTRIES = int(_get_config_value("max_tool_entries", section="synthesis", default=50))
@@ -240,10 +305,25 @@ LANGUAGE_CODE = _language_code if _language_code in SUPPORTED_LANGUAGES else "en
 # Prompts Archive Configuration
 # =============================================================================
 
-PROMPTS_ARCHIVE_ENABLED = _get_config_value("enabled", section="prompts_archive", default=False)
+PROMPTS_ARCHIVE_ENABLED = _get_config_value("enabled", section="prompts_archive", default=True)
 _prompts_file = _get_config_value("file", section="prompts_archive", default="prompts-archive.md")
 PROMPTS_ARCHIVE_PATH = VAULT_ROOT / _prompts_file
 PROMPTS_ARCHIVE_INCLUDE_PLAN_SUMMARY = _get_config_value("include_plan_summary", section="prompts_archive", default=True)
+
+# =============================================================================
+# Memory Configuration (Claude Code auto-memory integration)
+# =============================================================================
+
+_memory_enabled = _get_config_value("enabled", section="memory", default=True)
+if isinstance(_memory_enabled, str):
+    _memory_enabled = _memory_enabled.lower() == "true"
+
+MEMORY_ENABLED = _memory_enabled
+MEMORY_MODEL = _get_config_value("model", section="memory", default=None)  # None = use SYNTH_MODEL
+MEMORY_TIMEOUT = int(_get_config_value("timeout", section="memory", default=60))
+MEMORY_MAX_LINES = int(_get_config_value("max_lines", section="memory", default=190))
+MEMORY_STALE_DAYS = int(_get_config_value("stale_days", section="memory", default=90))
+MEMORY_DEDUP_THRESHOLD = float(_get_config_value("dedup_threshold", section="memory", default=0.6))
 
 # =============================================================================
 # Cleanup Configuration
@@ -297,4 +377,5 @@ def get_config_summary() -> dict:
         "language_code": LANGUAGE_CODE,
         "prompts_archive_enabled": PROMPTS_ARCHIVE_ENABLED,
         "prompts_archive_path": str(PROMPTS_ARCHIVE_PATH),
+        "memory_enabled": MEMORY_ENABLED,
     }

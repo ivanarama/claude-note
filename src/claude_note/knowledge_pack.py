@@ -100,6 +100,7 @@ class KnowledgePack:
     date: str                              # ISO date (YYYY-MM-DD)
     title: str                             # Human-readable session title
     time: str = ""                         # Time (HH:MM:SS), optional
+    model_used: str = ""                   # Model used for synthesis (e.g., "claude-4.5")
     highlights: list[str] = field(default_factory=list)  # 1-3 key outcomes
     concepts: list[Concept] = field(default_factory=list)
     decisions: list[Decision] = field(default_factory=list)
@@ -121,6 +122,8 @@ class KnowledgePack:
         }
         if self.time:
             d["time"] = self.time
+        if self.model_used:
+            d["model_used"] = self.model_used
         return d
 
     def to_json(self, indent: int = 2) -> str:
@@ -133,6 +136,7 @@ class KnowledgePack:
             date=data.get("date", ""),
             title=data.get("title", ""),
             time=data.get("time", ""),
+            model_used=data.get("model_used", ""),
             highlights=data.get("highlights", []),
             concepts=[Concept.from_dict(c) for c in data.get("concepts", [])],
             decisions=[Decision.from_dict(d) for d in data.get("decisions", [])],

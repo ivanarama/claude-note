@@ -11,6 +11,7 @@ Commands:
     index     - Rebuild vault index
     clean     - Daily cleanup operations
     prompts   - Show prompts archive status
+    web       - Start web API server for management
 """
 
 import argparse
@@ -154,6 +155,11 @@ def cmd_status(args) -> int:
     else:
         print("  (not created yet)")
 
+    # Features status
+    print(f"\nFeatures")
+    print(f"  Prompts Archive:  {'enabled' if config.PROMPTS_ARCHIVE_ENABLED else 'disabled'}")
+    print(f"  Auto-Memory:      {'enabled' if config.MEMORY_ENABLED else 'disabled'}")
+
     print()
 
     return 0
@@ -263,6 +269,18 @@ def cmd_ingest(args) -> int:
     """Handle ingest command - ingest external research documents."""
     from . import ingest
     return ingest.main(args)
+
+
+def cmd_web(args) -> int:
+    """Handle web command - start web API server."""
+    from . import web_api
+
+    host = args.host or "127.0.0.1"
+    port = args.port or 8080
+
+    print(f"Starting claude-note web server on http://{host}:{port}")
+    web_api.run_server(host=host, port=port)
+    return 0
 
 
 def cmd_prompts(args) -> int:
@@ -489,6 +507,18 @@ def main() -> int:
         "prompts", help="Show prompts archive status"
     )
     prompts_parser.set_defaults(func=cmd_prompts)
+
+    # web command
+    web_parser = subparsers.add_parser(
+        "web", help="Start web API server for management"
+    )
+    web_parser.add_argument(
+        "--host", "-H", help="Host to bind to (default: 127.0.0.1)"
+    )
+    web_parser.add_argument(
+        "--port", "-p", type=int, help="Port to bind to (default: 8080)"
+    )
+    web_parser.set_defaults(func=cmd_web)
 
     args = parser.parse_args()
 

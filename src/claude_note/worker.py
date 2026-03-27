@@ -25,6 +25,7 @@ from . import vault_indexer
 from . import version_checker
 from . import prompts_archive
 from . import transcript_reader
+from . import memory_writer
 
 
 # Global flag for graceful shutdown
@@ -82,6 +83,11 @@ def update_session_summary(state: models.SessionState, pack, logger: logging.Log
         # Build summary content
         summary_lines = [f"**{pack.title}**", ""]
 
+        # Add model info if available
+        if pack.model_used:
+            summary_lines.append(f"*Synthesized with: {pack.model_used}*")
+            summary_lines.append("")
+
         if pack.highlights:
             summary_lines.append("Key outcomes:")
             for h in pack.highlights:
@@ -115,11 +121,12 @@ def update_session_summary(state: models.SessionState, pack, logger: logging.Log
 
         # Write atomically
         temp_path = note_path.with_suffix(".tmp")
-        temp_path.write_text(new_content, encoding="utf-8")
+        temp_path.write_text(new_content, encoding="utf-8", errors="surrogatepass")
         # Windows: use os.replace() to overwrite existing file
         os.replace(temp_path, note_path)
 
-        logger.info(f"Updated session summary: {pack.title}")
+        model_info = f" ({pack.model_used})" if pack.model_used else ""
+        logger.info(f"Updated session summary: {pack.title}{model_info}")
         return True
 
     except Exception as e:
@@ -150,12 +157,20 @@ def run_synthesis(state: models.SessionState, logger: logging.Logger) -> bool:
         logger.info(f"Synthesizing session {state.session_id[:8]}...")
         pack = synthesizer.synthesize_from_state(state, vault_index)
 
+        if pack and pack.model_used:
+            logger.info(f"Session {state.session_id[:8]}: synthesized with {pack.model_used}")
+
         if pack is None or pack.is_empty():
             logger.info(f"Session {state.session_id[:8]}: no knowledge extracted")
             return False
 
         # Update session note summary with synthesis results
         update_session_summary(state, pack, logger)
+
+        # Save model used to state
+        if pack.model_used:
+            state.synth_model = pack.model_used
+            session_tracker.save_session_state(state)
 
         # Apply note ops
         results = note_router.apply_note_ops(pack, mode=config.SYNTH_MODE)
@@ -192,6 +207,23 @@ def run_synthesis(state: models.SessionState, logger: logging.Logger) -> bool:
                 # Don't fail synthesis if prompts archive fails
                 logger.warning(f"Failed to archive prompts: {e}")
 
+        # Update auto-memory (if enabled)
+        if config.MEMORY_ENABLED:
+            try:
+                result = memory_writer.update_memory(
+                    pack=pack,
+                    cwd=state.cwd,
+                    transcript_path=state.transcript_path or "",
+                    logger=logger,
+                )
+                if result["memory_updated"]:
+                    logger.info(
+                        f"Memory: +{result['entries_added']}/-{result['entries_removed']} entries"
+                    )
+            except Exception as e:
+                # Don't fail synthesis if memory update fails
+                logger.warning(f"Failed to update memory: {e}")
+
         return True
 
     except Exception as e:
@@ -199,16 +231,19 @@ def run_synthesis(state: models.SessionState, logger: logging.Logger) -> bool:
         return False
 
 
-def process_session(session_id: str, events: list, logger: logging.Logger) -> bool:
+def process_session(session_id: str, events: list, logger: logging.Logger) -> tuple[bool, bool]:
     """
     Process a single session.
 
-    Returns True if note was written, False otherwise.
+    Returns:
+        Tuple of (written, should_remove):
+        - written: True if note was written
+        - should_remove: True if events can be removed from queue
     """
     with session_tracker.session_lock(session_id) as acquired:
         if not acquired:
             logger.debug(f"Could not acquire lock for session {session_id[:8]}")
-            return False
+            return False, False  # Don't remove, may need retry
 
         try:
             # Update session state from events
@@ -221,7 +256,7 @@ def process_session(session_id: str, events: list, logger: logging.Logger) -> bo
             )
             if not has_user_prompt:
                 logger.debug(f"Session {session_id[:8]}: no user prompt, skipping")
-                return False
+                return False, True  # Remove, no processing needed
 
             # Check if we should write now
             immediate = session_tracker.should_flush_immediately(events)
@@ -231,13 +266,13 @@ def process_session(session_id: str, events: list, logger: logging.Logger) -> bo
             already_written = session_tracker.is_session_written(state)
             if already_written:
                 logger.debug(f"Session {session_id[:8]}: already written, skipping")
-                return False
+                return False, True  # Remove, already processed
 
             if not immediate and not debounce_ok:
                 # Save state but don't write note yet
                 session_tracker.save_session_state(state)
                 logger.debug(f"Session {session_id[:8]}: debounce not ready")
-                return False
+                return False, False  # Don't remove, needs more time
 
             # Write the note
             note_path = note_writer.update_session_note(state)
@@ -256,11 +291,11 @@ def process_session(session_id: str, events: list, logger: logging.Logger) -> bo
             state.last_write_ts = datetime.utcnow().isoformat() + "Z"
             session_tracker.save_session_state(state)
 
-            return True
+            return True, True  # Written, can remove
 
         except Exception as e:
             logger.error(f"Error processing session {session_id[:8]}: {e}")
-            return False
+            return False, False  # Don't remove on error, may retry
 
 
 def poll_once(logger: logging.Logger) -> int:
@@ -284,9 +319,11 @@ def poll_once(logger: logging.Logger) -> int:
     events_to_remove: set = set()
 
     for session_id, events in sessions.items():
-        if process_session(session_id, events, logger):
+        written, should_remove = process_session(session_id, events, logger)
+        if written:
             notes_written += 1
-            # Mark session's events for removal after successful write
+        # Always remove events if they don't need further processing
+        if should_remove:
             events_to_remove.update(session_event_ids[session_id])
 
     # Remove processed events from queue
@@ -355,3 +392,18 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# Allow running as module: python -m claude_note.worker
+def _run_as_module() -> None:
+    """Entry point when run as python -m claude_note.worker."""
+    import argparse
+    parser = argparse.ArgumentParser(description="Claude Note background worker")
+    parser.add_argument("--foreground", "-f", action="store_true")
+    parser.add_argument("--verbose", "-v", action="store_true")
+    args = parser.parse_args()
+    sys.exit(run_worker(foreground=args.foreground, verbose=args.verbose))
+
+
+if __name__ == "__mp_main__":  # Set by multiprocessing when spawning
+    _run_as_module()

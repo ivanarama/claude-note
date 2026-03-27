@@ -59,6 +59,7 @@ class SessionState:
     first_event_ts: str                     # When session started
     last_event_ts: str                      # Last event received
     last_write_ts: Optional[str] = None     # When note was last written
+    synth_model: Optional[str] = None       # Model used for synthesis
     processed_event_ids: list = field(default_factory=list)
     cwd: str = ""
     transcript_path: str = ""
@@ -72,6 +73,9 @@ class SessionState:
     def from_json(cls, json_str: str) -> "SessionState":
         """Deserialize from JSON string."""
         data = json.loads(json_str)
+        # Handle missing synth_model for backwards compatibility
+        if "synth_model" not in data:
+            data["synth_model"] = None
         return cls(**data)
 
     def should_write(self, debounce_seconds: float) -> bool:

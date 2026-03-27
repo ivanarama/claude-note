@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>claude-note</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232733;
+    --border: #2e3348;
+    --text: #e1e4ed;
+    --text2: #8b8fa3;
+    --accent: #6c7ee1;
+    --accent2: #8b9cf7;
+    --green: #4ade80;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --cyan: #22d3ee;
+    --radius: 8px;
+    --font: 'Inter', -apple-system, system-ui, sans-serif;
+    --mono: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 24px 20px; }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .logo {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--accent2); }
+
+  .worker-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .status-badge {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+  .status-badge.running {
+    color: var(--green);
+    background: #4ade8018;
+  }
+  .status-badge.stopped {
+    color: var(--text2);
+    background: var(--surface2);
+  }
+
+  /* Stats row */
+  .stats-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    flex: 1;
+    min-width: 140px;
+  }
+  .stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text2);
+    margin-bottom: 4px;
+  }
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  /* Controls */
+  .controls {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 20px;
+  }
+  .controls-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 9px 18px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--border); }
+  .btn-sm { padding: 5px 10px; font-size: 11px; border-radius: 4px; }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+
+  .model-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .model-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .model-item .model-name { flex: 1; }
+  .model-item .model-actions { display: flex; gap: 4px; }
+  .model-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--surface2);
+    color: var(--accent2);
+    margin-right: 6px;
+  }
+  .model-name-only { color: var(--text); }
+
+  /* Filter bar */
+  .filter-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 5px 14px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: transparent;
+    color: var(--text2);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+  .filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* Session list */
+  .session-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .session-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  .session-row:hover { border-color: var(--accent); }
+
+  .session-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    user-select: text;
+  }
+  .session-toggle {
+    cursor: pointer;
+    user-select: none;
+    padding: 4px;
+    margin: -4px;
+  }
+  .session-toggle:hover {
+    color: var(--accent);
+  }
+  .session-id {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+    min-width: 50px;
+  }
+  .session-status {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .session-status.written { color: var(--green); background: #4ade8015; }
+  .session-status.pending { color: var(--text2); background: var(--surface2); }
+  .session-status.processing { color: var(--cyan); background: #22d3ee15; }
+
+  .session-model {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--purple);
+    background: #a855f715;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--mono);
+  }
+
+  .session-cwd {
+    flex: 1;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .session-meta {
+    font-size: 11px;
+    color: var(--text2);
+    font-family: var(--mono);
+  }
+  .session-time {
+    font-size: 11px;
+    color: var(--accent2);
+    font-family: var(--mono);
+  }
+
+  .session-detail {
+    display: none;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .session-row.expanded .session-detail { display: block; }
+
+  .detail-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text2);
+    margin-top: 10px;
+    margin-bottom: 6px;
+  }
+  .detail-info {
+    font-size: 12px;
+    color: var(--text2);
+    font-family: var(--mono);
+    background: var(--bg);
+    padding: 10px;
+    border-radius: 6px;
+  }
+  .detail-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  /* Logs */
+  .logs-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-top: 24px;
+  }
+  .logs-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logs-title {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .logs-content {
+    max-height: 250px;
+    overflow-y: auto;
+    padding: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .log-entry {
+    padding: 4px 0;
+    display: flex;
+    gap: 8px;
+  }
+  .log-time { color: var(--text2); }
+  .log-level { color: var(--accent2); min-width: 60px; }
+  .log-msg { color: var(--text); }
+  .log-error { color: var(--red); }
+  .log-warn { color: var(--yellow); }
+
+  .empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text2);
+  }
+
+  /* Config modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+  }
+  .modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .modal-body { margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-label {
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 6px;
+    display: block;
+  }
+  .form-input, .form-select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+  .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">claude<span>-note</span></div>
+    <div class="worker-status">
+      <span class="status-badge" id="workerBadge">checking...</span>
+    </div>
+  </header>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Queue Events</div>
+      <div class="stat-value" id="queueEvents">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Sessions</div>
+      <div class="stat-value" id="totalSessions">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Written</div>
+      <div class="stat-value" style="color: var(--green);" id="writtenSessions">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pending</div>
+      <div class="stat-value" style="color: var(--yellow);" id="pendingSessions">-</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="controls-row">
+      <button class="btn btn-primary" id="startBtn" onclick="startWorker()">Start Worker</button>
+      <button class="btn btn-danger" id="stopBtn" onclick="stopWorker()">Stop Worker</button>
+      <button class="btn btn-ghost" onclick="openModelConfig()">Configure Models</button>
+    </div>
+  </div>
+
+  <div class="filter-bar" id="filterBar">
+    <button class="filter-btn active" data-filter="">All</button>
+    <button class="filter-btn" data-filter="pending">Pending</button>
+    <button class="filter-btn" data-filter="written">Written</button>
+  </div>
+
+  <div class="session-list" id="sessionList"></div>
+
+  <div class="logs-panel">
+    <div class="logs-header">
+      <span class="logs-title">Recent Logs</span>
+      <button class="btn btn-sm btn-ghost" onclick="refreshLogs()">Refresh</button>
+    </div>
+    <div class="logs-content" id="logsContent"></div>
+  </div>
+</div>
+
+<!-- Model Config Modal -->
+<div class="modal-overlay" id="modelModal">
+  <div class="modal">
+    <div class="modal-title">Model Configuration</div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Models (in order of preference)</label>
+        <div id="modelList" class="model-list"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Add Model</label>
+        <div style="display: flex; gap: 8px;">
+          <select class="form-select" id="modelPresetSelect" style="flex: 1;" onchange="onPresetSelect()">
+            <option value="">-- Select preset or type custom --</option>
+          </select>
+          <input type="text" class="form-input" id="newModelInput" placeholder="or type custom..." style="flex: 1;">
+          <button class="btn btn-sm btn-primary" onclick="addModel()">Add</button>
+        </div>
+        <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">
+          Use <code>profile:model</code> for custom providers (e.g., <code>claude-z:glm-4.7</code>), or just model name for default claude CLI.
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModelConfig()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveModelConfig()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+let currentFilter = '';
+let expandedId = null;
+let modelsCache = [];
+
+// === API calls ===
+async function apiCall(url, opts) {
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// === Status ===
+async function loadStatus() {
+  const s = await apiCall(`${API}/status`);
+
+  // Worker badge
+  const badge = document.getElementById('workerBadge');
+  if (s.worker.running) {
+    badge.textContent = 'running';
+    badge.className = 'status-badge running';
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = false;
+  } else {
+    badge.textContent = 'stopped';
+    badge.className = 'status-badge stopped';
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+  }
+
+  // Stats
+  document.getElementById('queueEvents').textContent = s.queue.events;
+  document.getElementById('totalSessions').textContent = s.queue.sessions;
+  document.getElementById('writtenSessions').textContent = s.queue.written;
+  document.getElementById('pendingSessions').textContent = s.queue.pending;
+
+  modelsCache = s.config.models || [];
+}
+
+// === Sessions ===
+async function loadSessions() {
+  const params = currentFilter ? `?status=${currentFilter}&limit=100` : '?limit=100';
+  const sessions = await apiCall(`${API}/sessions${params}`);
+  const list = document.getElementById('sessionList');
+
+  if (!sessions.length) {
+    list.innerHTML = `<div class="empty">No sessions${currentFilter ? ' with status "' + currentFilter + '"' : ''}.</div>`;
+    return;
+  }
+
+  // Helper to get status display
+  function getStatusLabel(s) {
+    if (s.status === 'written') return 'done';
+    return 'pending';
+  }
+
+  if (!sessions.length) {
+    list.innerHTML = `<div class="empty">No sessions${currentFilter ? ' with status "' + currentFilter + '"' : ''}.</div>`;
+    return;
+  }
+
+  list.innerHTML = sessions.map(s => {
+    const expanded = s.session_id === expandedId;
+    // Use last_event for timestamp (when last activity happened), fallback to last_write
+    const timeDisplay = (s.last_event || s.last_write) ? formatTime(s.last_event || s.last_write) : '';
+    const modelDisplay = s.synth_model ? `<span class="session-model" title="Synthesized with ${esc(s.synth_model)}">${esc(s.synth_model)}</span>` : '';
+    return `
+    <div class="session-row${expanded ? ' expanded' : ''}">
+      <div class="session-header">
+        <span class="session-toggle" onclick="toggleSession('${s.session_id}')">${expanded ? '▼' : '▶'}</span>
+        <span class="session-id">${s.session_id.slice(0, 8)}</span>
+        <span class="session-status ${s.status}">${getStatusLabel(s)}</span>
+        ${modelDisplay}
+        <span class="session-cwd">${esc(s.cwd || 'unknown')}</span>
+        <span class="session-meta">${s.event_count} events</span>
+        ${timeDisplay ? `<span class="session-time">${timeDisplay}</span>` : ''}
+      </div>
+      <div class="session-detail">
+        <div class="detail-label">Session ID</div>
+        <div class="detail-info">${s.session_id}</div>
+
+        ${s.last_event ? `
+          <div class="detail-label">Last Activity</div>
+          <div class="detail-info">${new Date(s.last_event).toLocaleString()}</div>
+        ` : ''}
+
+        ${s.last_write ? `
+          <div class="detail-label">Processed</div>
+          <div class="detail-info">${new Date(s.last_write).toLocaleString()}</div>
+        ` : ''}
+
+        ${s.synth_model ? `
+          <div class="detail-label">Synthesis Model</div>
+          <div class="detail-info">${esc(s.synth_model)}</div>
+        ` : ''}
+
+        ${s.transcript ? `
+          <div class="detail-label">Transcript</div>
+          <div class="detail-info">${s.transcript}</div>
+        ` : ''}
+
+        <div class="detail-actions">
+          <button class="btn btn-sm btn-primary" onclick="retrySession(event, '${s.session_id}')">Retry Synthesis</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function retrySession(e, id) {
+  e.stopPropagation();
+  try {
+    await apiCall(`${API}/sessions/${id}/retry`, { method: 'POST' });
+    refresh();
+  } catch (err) {
+    alert('Retry failed: ' + err.message);
+  }
+}
+
+function toggleSession(id) {
+  expandedId = expandedId === id ? null : id;
+  loadSessions();
+}
+
+// === Worker ===
+async function startWorker() {
+  await apiCall(`${API}/worker/start`, { method: 'POST' });
+  refresh();
+}
+
+async function stopWorker() {
+  await apiCall(`${API}/worker/stop`, { method: 'POST' });
+  refresh();
+}
+
+// === Model Config ===
+let modelSuggestions = [];
+
+async function openModelConfig() {
+  // Reload fresh data from server
+  await loadStatus();
+  renderModelList();
+  loadModelPresets();
+  document.getElementById('modelModal').classList.add('active');
+}
+
+function closeModelConfig() {
+  document.getElementById('modelModal').classList.remove('active');
+}
+
+async function loadModelPresets() {
+  try {
+    const data = await apiCall(`${API}/models`);
+    modelSuggestions = data.suggestions || [];
+    const select = document.getElementById('modelPresetSelect');
+    select.innerHTML = '<option value="">-- Select preset or type custom --</option>';
+    modelSuggestions.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.value;
+      opt.textContent = s.label;
+      select.appendChild(opt);
+    });
+  } catch (e) {
+    console.error('Failed to load model presets:', e);
+  }
+}
+
+function onPresetSelect() {
+  const select = document.getElementById('modelPresetSelect');
+  const input = document.getElementById('newModelInput');
+  if (select.value) {
+    input.value = select.value;
+  }
+}
+
+function renderModelList() {
+  const list = document.getElementById('modelList');
+
+  // Helper to parse model entry
+  function parseModel(entry) {
+    if (entry.includes(':')) {
+      const [profile, model] = entry.split(':', 2);
+      return { profile, model, full: entry };
+    }
+    return { profile: '', model: entry, full: entry };
+  }
+
+  list.innerHTML = modelsCache.map((m, i) => {
+    const { profile, model } = parseModel(m);
+    const display = profile
+      ? `<span class="model-badge">${esc(profile)}</span><span class="model-name-only">${esc(model)}</span>`
+      : `<span class="model-name-only">${esc(model)}</span>`;
+
+    return `
+    <div class="model-item">
+      <span class="model-name">${display}</span>
+      <div class="model-actions">
+        <button class="btn btn-sm btn-ghost" onclick="moveModel(${i}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="btn btn-sm btn-ghost" onclick="moveModel(${i}, 1)" ${i === modelsCache.length - 1 ? 'disabled' : ''}>↓</button>
+        <button class="btn btn-sm btn-danger" onclick="removeModel(${i})">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function moveModel(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= modelsCache.length) return;
+  [modelsCache[idx], modelsCache[newIdx]] = [modelsCache[newIdx], modelsCache[idx]];
+  renderModelList();
+}
+
+function removeModel(idx) {
+  if (modelsCache.length <= 1) return alert('Need at least one model');
+  modelsCache.splice(idx, 1);
+  renderModelList();
+}
+
+function addModel() {
+  const input = document.getElementById('newModelInput');
+  const val = input.value.trim();
+  if (!val) return;
+  if (modelsCache.includes(val)) return alert('Model already in list');
+  modelsCache.push(val);
+  input.value = '';
+  renderModelList();
+}
+
+async function saveModelConfig() {
+  try {
+    const result = await apiCall(`${API}/models`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(modelsCache),
+    });
+    // Reload models from server to confirm save
+    await loadStatus();
+    closeModelConfig();
+  } catch (err) {
+    alert('Failed to save: ' + err.message + '\n\nCheck console for details');
+    console.error('Save error:', err);
+  }
+}
+
+// === Logs ===
+async function loadLogs() {
+  const logs = await apiCall(`${API}/logs?limit=50`);
+  const content = document.getElementById('logsContent');
+
+  if (!logs.length) {
+    content.innerHTML = '<div style="color: var(--text2); text-align: center; padding: 20px;">No logs yet</div>';
+    return;
+  }
+
+  content.innerHTML = logs.map(l => {
+    let levelClass = 'log-msg';
+    if (l.level === 'ERROR') levelClass = 'log-error';
+    else if (l.level === 'WARNING') levelClass = 'log-warn';
+
+    // Parse timestamp: "YYYY-MM-DD HH:MM:SS,mmm" -> extract HH:MM:SS
+    const timePart = l.timestamp.split(' ')[1]?.slice(0, 8) || '';
+    return `
+    <div class="log-entry">
+      <span class="log-time">${timePart}</span>
+      <span class="log-level">${l.level}</span>
+      <span class="${levelClass}">${esc(l.message)}</span>
+    </div>`;
+  }).join('');
+}
+
+function refreshLogs() { loadLogs(); }
+
+// === Filters ===
+document.getElementById('filterBar').addEventListener('click', e => {
+  if (!e.target.matches('.filter-btn')) return;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  currentFilter = e.target.dataset.filter;
+  loadSessions();
+});
+
+// === Helpers ===
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatTime(isoString) {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diff = now - date;
+
+  // Less than 1 minute
+  if (diff < 60000) {
+    return Math.floor(diff / 1000) + 's';
+  }
+  // Less than 1 hour
+  if (diff < 3600000) {
+    return Math.floor(diff / 60000) + 'm';
+  }
+  // Less than 1 day
+  if (diff < 86400000) {
+    return Math.floor(diff / 3600000) + 'h';
+  }
+  // Show date for older
+  return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+}
+
+function refresh() { loadStatus(); loadSessions(); loadLogs(); }
+
+// === Init ===
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

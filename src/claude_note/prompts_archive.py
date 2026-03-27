@@ -97,6 +97,7 @@ def _is_synthesis_prompt(prompt: str, cwd: str) -> bool:
     synthesis_markers = [
         "Вы извлекаете устойчивые знания из сессии",
         "Extract durable knowledge from a Claude Code session",
+        "You are evaluating whether a question extracted from a Claude Code",
         "## Контекст сессии",
         "## Your task",
         "note_ops",

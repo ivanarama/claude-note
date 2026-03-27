@@ -63,6 +63,7 @@ def filter_questions_with_llm(questions: list) -> list:
     # Disable hooks to prevent recursion
     env = os.environ.copy()
     env["CLAUDE_CODE_HOOKS_ENABLED"] = "false"
+    env["CLAUDE_NOTE_SYNTHESIS"] = "1"
 
     for question in questions:
         # Skip obviously short/junk questions without LLM call
@@ -209,7 +210,7 @@ def append_questions_to_open_questions(state, questions: list) -> int:
 
     # Atomic write
     temp_path = config.OPEN_QUESTIONS_FILE.with_suffix(".tmp")
-    temp_path.write_text(new_content, encoding="utf-8")
+    temp_path.write_text(new_content, encoding="utf-8", errors="surrogatepass")
     # Windows: use os.replace() to overwrite existing file
     os.replace(temp_path, config.OPEN_QUESTIONS_FILE)
 

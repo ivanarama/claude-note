@@ -80,7 +80,7 @@ def create_note(
 
     # Atomic write
     temp_path = note_path.with_suffix(".tmp")
-    temp_path.write_text(content, encoding="utf-8")
+    temp_path.write_text(content, encoding="utf-8", errors="surrogatepass")
     # Windows: use os.replace() to overwrite existing file
     os.replace(temp_path, note_path)
 
@@ -489,7 +489,7 @@ Synthesized knowledge from Claude sessions. Review and promote to permanent note
 ---
 
 """
-        inbox_path.write_text(header + entry, encoding="utf-8")
+        inbox_path.write_text(header + entry, encoding="utf-8", errors="surrogatepass")
     else:
         # Prepend to existing (after header)
         current = inbox_path.read_text(encoding="utf-8")
@@ -523,7 +523,7 @@ Synthesized knowledge from Claude sessions. Review and promote to permanent note
             else:
                 new_content = entry + current
 
-        inbox_path.write_text(new_content, encoding="utf-8")
+        inbox_path.write_text(new_content, encoding="utf-8", errors="surrogatepass")
 
     return inbox_path
 

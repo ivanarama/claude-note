@@ -56,7 +56,7 @@ def save_session_state(state: models.SessionState) -> None:
 
     # Atomic write via temp file
     temp_file = state_file.with_suffix(".tmp")
-    temp_file.write_text(state.to_json(), encoding="utf-8")
+    temp_file.write_text(state.to_json(), encoding="utf-8", errors="surrogatepass")
     # Windows: use os.replace() to overwrite existing file
     os.replace(temp_file, state_file)
 
@@ -107,6 +107,8 @@ def is_recursive_event(event: models.QueuedEvent) -> bool:
     # Check user prompt for synthesis markers (more specific)
     prompt = data.get("prompt", "")
     if "extracting durable knowledge" in prompt.lower():
+        return True
+    if "you are evaluating whether a question extracted from a claude code" in prompt.lower():
         return True
 
     return False

@@ -288,7 +288,7 @@ def write_session_note(state: models.SessionState) -> Path:
 
     # Atomic write
     temp_path = note_path.with_suffix(".tmp")
-    temp_path.write_text(content, encoding="utf-8")
+    temp_path.write_text(content, encoding="utf-8", errors="surrogatepass")
     # Windows: use os.replace() to overwrite existing file
     os.replace(temp_path, note_path)
 
@@ -352,7 +352,7 @@ def update_session_note(state: models.SessionState) -> Path:
 
     # Atomic write
     temp_path = note_path.with_suffix(".tmp")
-    temp_path.write_text(new_content, encoding="utf-8")
+    temp_path.write_text(new_content, encoding="utf-8", errors="surrogatepass")
     # Windows: use os.replace() to overwrite existing file
     os.replace(temp_path, note_path)
 

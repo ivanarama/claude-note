@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -327,51 +328,78 @@ def synthesize_session(
     Returns:
         KnowledgePack or None on failure
     """
+    # Determine models to try
     if model is None:
-        model = config.SYNTH_MODEL
+        models = config.SYNTH_MODELS
+    else:
+        models = [model]
 
     now = datetime.utcnow()
     date = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
     prompt = build_synthesis_prompt(transcript, vault_index, cwd=cwd, date=date)
 
-    # Call claude CLI in print mode
     # Set marker so enqueue.py skips events from synthesis sessions
     env = os.environ.copy()
     env["CLAUDE_NOTE_SYNTHESIS"] = "1"
 
-    try:
-        result = subprocess.run(
-            ["claude", "-p", prompt, "--model", model],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
-            timeout=timeout,
-        )
+    # Try each model in list (fallback)
+    last_error = None
+    for attempt, try_model_entry in enumerate(models):
+        try:
+            if attempt > 0:
+                # Exponential backoff before retry
+                delay = config.SYNTH_MODEL_RETRY_DELAY * (2 ** (attempt - 1))
+                time.sleep(delay)
 
-        if result.returncode != 0:
-            raise RuntimeError(f"Claude CLI failed: {result.stderr}")
+            # Parse model entry to get command and model name
+            # e.g., "claude-z:glm-4.7" -> command="claude-z", model="glm-4.7"
+            command = config.get_model_command(try_model_entry)
+            model_name = config.get_model_name(try_model_entry)
 
-        pack = parse_knowledge_pack(result.stdout)
+            result = subprocess.run(
+                [command, "-p", prompt, "--model", model_name],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+                timeout=timeout,
+            )
 
-        # Set the time (Claude doesn't return this, we set it ourselves)
-        if not pack.time:
-            pack.time = time_str
+            if result.returncode != 0:
+                raise RuntimeError(f"Claude CLI failed: {result.stderr}")
 
-        # Validate
-        warnings = knowledge_pack.validate_knowledge_pack(pack)
-        if warnings:
-            # Log warnings but don't fail
-            pass
+            pack = parse_knowledge_pack(result.stdout)
 
-        return pack
+            # Set the time (Claude doesn't return this, we set it ourselves)
+            if not pack.time:
+                pack.time = time_str
 
-    except subprocess.TimeoutExpired:
-        raise RuntimeError(f"Synthesis timed out after {timeout}s")
-    except FileNotFoundError:
-        raise RuntimeError("Claude CLI not found. Is it installed?")
+            # Track which model succeeded
+            pack.model_used = try_model_entry
+
+            # Validate
+            warnings = knowledge_pack.validate_knowledge_pack(pack)
+            if warnings:
+                # Log warnings but don't fail
+                pass
+
+            return pack
+
+        except subprocess.TimeoutExpired:
+            last_error = RuntimeError(f"Synthesis with {try_model} timed out after {timeout}s")
+            continue
+        except FileNotFoundError:
+            raise RuntimeError("Claude CLI not found. Is it installed?")
+        except Exception as e:
+            last_error = e
+            continue
+
+    # All models failed
+    if last_error:
+        raise last_error
+    return None
 
 
 def synthesize_from_state(state, vault_index: vault_indexer.VaultIndex = None, model: str = None) -> Optional[knowledge_pack.KnowledgePack]:
