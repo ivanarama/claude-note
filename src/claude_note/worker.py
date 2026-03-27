@@ -164,14 +164,20 @@ def run_synthesis(state: models.SessionState, logger: logging.Logger) -> bool:
         if prompts_archive.is_prompts_archive_enabled():
             try:
                 transcript = transcript_reader.read_transcript_from_state(state)
-                if prompts_archive.append_prompts_to_archive(
-                    session_id=state.session_id,
-                    cwd=state.cwd,
-                    user_prompts=transcript.user_prompts,
-                    plan=transcript.plan,
-                    summary=transcript.summary,
-                ):
-                    logger.debug(f"Archived {len(transcript.user_prompts)} prompts")
+                if transcript.user_prompts:
+                    ok = prompts_archive.append_prompts_to_archive(
+                        session_id=state.session_id,
+                        cwd=state.cwd,
+                        user_prompts=transcript.user_prompts,
+                        plan=transcript.plan,
+                        summary=transcript.summary,
+                    )
+                    if ok:
+                        logger.debug(f"Archived {len(transcript.user_prompts)} prompts")
+                    else:
+                        logger.debug(f"Prompts archive skipped (duplicate or filtered)")
+                else:
+                    logger.debug(f"Prompts archive skipped: no user prompts in transcript")
             except Exception as e:
                 logger.warning(f"Failed to archive prompts: {e}")
 
