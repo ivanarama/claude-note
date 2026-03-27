@@ -223,7 +223,7 @@ def append_prompts_to_archive(
     try:
         # Use current time if no timestamp provided
         if timestamp is None:
-            timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Format the entry
         lines = [
