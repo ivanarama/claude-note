@@ -229,30 +229,30 @@ async def get_status() -> dict:
 @app.get("/api/sessions")
 async def list_sessions(limit: int = 100, status: Optional[str] = None) -> List[dict]:
     """List all sessions with optional filtering."""
-    sessions: Dict[str, List] = {}
+    # Read from state directory instead of queue (worker may have processed events)
+    sessions: Dict[str, dict] = {}
     for event in queue_manager.read_all_events():
         if event.session_id not in sessions:
-            sessions[event.session_id] = []
-        sessions[event.session_id].append(event)
+            sessions[event.session_id] = {"events": 0, "has_queue": True}
+        sessions[event.session_id]["events"] += 1
+
+    # Also add sessions from state directory (even if queue is empty)
+    if config.STATE_DIR.exists():
+        for state_file in config.STATE_DIR.glob("*.json"):
+            session_id = state_file.stem
+            if session_id not in sessions:
+                sessions[session_id] = {"events": 0, "has_queue": False}
 
     result = []
-    for session_id, events in sessions.items():
+    for session_id, session_info in sessions.items():
         state = session_tracker.load_session_state(session_id)
 
-        # Determine status: check if ALL events have been processed
+        # Determine status: if synthesis was completed, it's written
         session_status = "pending"
         if state:
-            # Check if all events are processed
-            total_events = len(state.events)
-            processed_events = len(state.processed_event_ids) if state.processed_event_ids else 0
-            if total_events > 0 and processed_events >= total_events:
+            # If we have last_write_ts, synthesis was completed
+            if state.last_write_ts:
                 session_status = "written"
-            # Also check timestamp as fallback (for sessions without event list in state)
-            elif state.last_event_ts and state.last_write_ts:
-                last_event = datetime.fromisoformat(state.last_event_ts.rstrip("Z"))
-                last_write = datetime.fromisoformat(state.last_write_ts.rstrip("Z"))
-                if last_write >= last_event:
-                    session_status = "written"
 
         # Apply filter
         if status and session_status != status:
@@ -262,7 +262,7 @@ async def list_sessions(limit: int = 100, status: Optional[str] = None) -> List[
             "session_id": session_id,
             "status": session_status,
             "cwd": state.cwd if state else "",
-            "event_count": len(events),
+            "event_count": session_info.get("events", 0),
             "last_write": state.last_write_ts if state else None,
             "last_event": state.last_event_ts if state else None,
             "synth_model": state.synth_model if state else None,

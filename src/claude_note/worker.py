@@ -45,9 +45,10 @@ def setup_logging(verbose: bool = False) -> logging.Logger:
         level=level,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
-            logging.FileHandler(log_file),
+            logging.FileHandler(log_file, encoding="utf-8"),
             logging.StreamHandler() if verbose else logging.NullHandler(),
         ],
+        force=True,  # Reconfigure if already configured
     )
 
     return logging.getLogger("claude-note")
