@@ -180,14 +180,27 @@ async def get_status() -> dict:
     # Worker status
     worker_status = worker_manager.get_worker_status()
 
-    # Queue stats
+    # Session stats - read from state directory (not just queue)
+    # Worker may have processed events, so queue can be empty
     queue_files = list(config.QUEUE_DIR.glob("*.jsonl")) if config.QUEUE_DIR.exists() else []
     total_events = 0
     sessions: Dict[str, int] = {}
 
+    # Count events from queue
     for event in queue_manager.read_all_events():
         total_events += 1
         sessions[event.session_id] = sessions.get(event.session_id, 0) + 1
+
+    # Also add sessions from state directory
+    # Skip non-session files like vault_index.json, version-check.json
+    skipped = {"vault_index", "version-check"}
+    if config.STATE_DIR.exists():
+        for state_file in config.STATE_DIR.glob("*.json"):
+            session_id = state_file.stem
+            if session_id in skipped:
+                continue
+            if session_id not in sessions:
+                sessions[session_id] = 0  # No pending events, but session exists
 
     written_count = 0
     pending_count = 0
@@ -237,9 +250,13 @@ async def list_sessions(limit: int = 100, status: Optional[str] = None) -> List[
         sessions[event.session_id]["events"] += 1
 
     # Also add sessions from state directory (even if queue is empty)
+    # Skip non-session files like vault_index.json, version-check.json
+    skipped = {"vault_index", "version-check"}
     if config.STATE_DIR.exists():
         for state_file in config.STATE_DIR.glob("*.json"):
             session_id = state_file.stem
+            if session_id in skipped:
+                continue
             if session_id not in sessions:
                 sessions[session_id] = {"events": 0, "has_queue": False}
 
