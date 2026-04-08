@@ -464,8 +464,13 @@ async def rebuild_index() -> dict:
 
 def run_server(host: str = "127.0.0.1", port: int = 8080) -> None:
     """Run the web API server."""
+    import sys
     import uvicorn
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    # When running windowless (frozen without console), sys.stderr is None.
+    # Uvicorn's default colored formatter calls isatty() on stderr and crashes.
+    # Passing log_config=None disables uvicorn's logging setup entirely.
+    no_console = sys.stderr is None or not hasattr(sys.stderr, "isatty")
+    uvicorn.run(app, host=host, port=port, log_config=None, log_level="error" if no_console else "info")
 
 
 if __name__ == "__main__":

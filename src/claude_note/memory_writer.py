@@ -376,8 +376,7 @@ def _call_claude_for_curation(
         if resolved and resolved.lower().endswith((".bat", ".cmd")):
             exe_command = resolved
 
-    result = subprocess.run(
-        [exe_command, "--model", model_name],
+    run_kwargs: dict = dict(
         input=prompt,
         capture_output=True,
         text=True,
@@ -385,6 +384,12 @@ def _call_claude_for_curation(
         errors="replace",
         env=env,
         timeout=timeout,
+    )
+    if sys.platform == "win32":
+        run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    result = subprocess.run(
+        [exe_command, "--model", model_name],
+        **run_kwargs,
     )
 
     if result.returncode != 0:

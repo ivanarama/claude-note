@@ -310,6 +310,13 @@ def cmd_web(args) -> int:
     return 0
 
 
+def cmd_tray(args) -> int:
+    """Handle tray command - start system tray app."""
+    from . import tray
+    tray.run_tray()
+    return 0
+
+
 def cmd_backfill_prompts(args) -> int:
     """Backfill prompts archive from existing session states (no synthesis needed)."""
     from . import session_tracker
@@ -499,11 +506,13 @@ def cmd_update(args) -> int:
 
 def main() -> int:
     """Main entry point."""
-    # Fix Windows console encoding issues
+    # Fix Windows console encoding issues (skip when windowless / frozen without console)
     if sys.platform == "win32":
         import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+        if sys.stdout and hasattr(sys.stdout, "buffer"):
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        if sys.stderr and hasattr(sys.stderr, "buffer"):
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
     parser = argparse.ArgumentParser(
         description="Claude Note - session logging for Claude Code",
@@ -661,11 +670,19 @@ def main() -> int:
     )
     web_parser.set_defaults(func=cmd_web)
 
+    # tray command
+    tray_parser = subparsers.add_parser(
+        "tray", help="Start system tray app (worker + web UI)"
+    )
+    tray_parser.set_defaults(func=cmd_tray)
+
     args = parser.parse_args()
 
     if not args.command:
-        parser.print_help()
-        return 1
+        # Default: launch tray when run without arguments (e.g. cn.exe double-click)
+        import argparse as _ap
+        tray_args = _ap.Namespace(command="tray")
+        return cmd_tray(tray_args)
 
     return args.func(args)
 

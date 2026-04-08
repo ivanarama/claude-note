@@ -48,6 +48,7 @@ def _is_process_running(pid: int) -> bool:
             ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
             capture_output=True,
             text=True,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
         return str(pid) in result.stdout
     else:
@@ -98,7 +99,7 @@ def start_worker(foreground: bool = False, verbose: bool = False) -> bool:
             # Windows: use CREATE_NEW_PROCESS_GROUP
             process = subprocess.Popen(
                 cmd,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -133,7 +134,7 @@ def stop_worker() -> bool:
     try:
         if sys.platform == "win32":
             # Windows: use taskkill
-            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
         else:
             # Unix: send SIGTERM
             os.kill(pid, signal.SIGTERM)

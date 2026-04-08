@@ -368,8 +368,7 @@ def synthesize_session(
                     exe_command = resolved
 
             # Use stdin for prompt to avoid argument escaping issues
-            result = subprocess.run(
-                [exe_command, "--model", model_name],
+            kwargs: dict = dict(
                 input=prompt,
                 capture_output=True,
                 text=True,
@@ -377,6 +376,12 @@ def synthesize_session(
                 errors="replace",
                 env=env,
                 timeout=timeout,
+            )
+            if sys.platform == "win32":
+                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            result = subprocess.run(
+                [exe_command, "--model", model_name],
+                **kwargs,
             )
 
             if result.returncode != 0:

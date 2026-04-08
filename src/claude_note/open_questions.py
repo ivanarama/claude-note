@@ -7,6 +7,7 @@ and debugging chatter from polluting the open questions file.
 import json
 import os
 import subprocess
+import sys
 from datetime import datetime
 
 from . import config
@@ -75,12 +76,17 @@ def filter_questions_with_llm(questions: list) -> list:
         prompt = QUALITY_FILTER_PROMPT.format(question=question)
 
         try:
-            result = subprocess.run(
-                ["claude", "-p", prompt, "--model", model],
+            run_kwargs: dict = dict(
                 capture_output=True,
                 text=True,
                 env=env,
                 timeout=30,  # Short timeout for simple classification
+            )
+            if sys.platform == "win32":
+                run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            result = subprocess.run(
+                ["claude", "-p", prompt, "--model", model],
+                **run_kwargs,
             )
 
             if result.returncode != 0:

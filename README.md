@@ -37,21 +37,56 @@ cd claude-note
 
 ### Windows
 
+**Вариант 1 — готовый EXE (рекомендуется)**
+
+Скачайте `cn.exe` из [Releases](https://github.com/ivanarama/claude-note/releases), положите куда удобно и запустите. При двойном клике появляется иконка в трее — worker и Web UI стартуют автоматически.
+
 ```powershell
-# Clone and install
+# Создать конфиг
+mkdir $env:USERPROFILE\.config\claude-note
+echo 'vault_root = "C:\\path\\to\\your\\vault"' > $env:USERPROFILE\.config\claude-note\config.toml
+
+# Запустить (трей + автозапуск worker и Web UI)
+.\cn.exe
+
+# Или отдельные команды
+.\cn.exe status
+.\cn.exe worker --foreground
+.\cn.exe web
+```
+
+Хуки для Claude Code (укажите полный путь до cn.exe):
+```json
+{
+  "hooks": {
+    "PostToolUse":      [{"type": "command", "command": "C:\\tools\\cn.exe enqueue", "timeout": 5000}],
+    "UserPromptSubmit": [{"type": "command", "command": "C:\\tools\\cn.exe enqueue", "timeout": 5000}],
+    "Stop":             [{"type": "command", "command": "C:\\tools\\cn.exe enqueue", "timeout": 5000}]
+  }
+}
+```
+
+**Вариант 2 — из исходников**
+
+```powershell
 git clone https://github.com/ivanarama/claude-note.git
 cd claude-note
 pip install -e .
 
-# Create config
+# Создать конфиг
 mkdir $env:USERPROFILE\.config\claude-note
 echo 'vault_root = "C:\\path\\to\\your\\vault"' > $env:USERPROFILE\.config\claude-note\config.toml
 
-# Run worker (in foreground for testing)
+# Запустить
 python -m claude_note worker --foreground
+```
 
-# Or run as background service
-# Create a scheduled task or use Task Scheduler
+**Собрать EXE самостоятельно**
+
+```powershell
+# Из корня репозитория
+.\build.ps1
+# Готовый файл: dist\cn.exe
 ```
 
 The installer (macOS/Linux) will:
@@ -104,6 +139,8 @@ claude-note resynth <id> --memory-only  # Only update memory, skip note ops
 claude-note ingest <file>               # Ingest PDF/DOCX into literature notes
 claude-note prompts                     # Show prompts archive stats
 claude-note backfill-prompts            # Backfill prompts archive from past sessions
+claude-note web                         # Start Web UI on http://127.0.0.1:8080
+claude-note tray                        # Start system tray app (Windows)
 ```
 
 ## Configuration
@@ -243,26 +280,30 @@ systemctl --user start claude-note
 journalctl --user -u claude-note -f
 ```
 
-### Windows
+### Windows (cn.exe + трей)
+
+Самый простой способ — запустить `cn.exe` и управлять через иконку в трее:
+
+- **Правый клик** → Start/Stop Worker, Start/Stop Web UI, Открыть Web UI
+- **Иконка зелёная** — всё работает; **серая** — остановлено
+- Web UI открывается в браузере на `http://127.0.0.1:8080`
 
 ```powershell
-# Status
-python -m claude_note status
+# Статус
+.\cn.exe status
 
-# Run in foreground (for testing)
-python -m claude_note worker --foreground --verbose
+# Форсированная обработка очереди
+.\cn.exe drain
 
-# Run in background
-Start-Process python -ArgumentList "-m claude_note worker" -WindowStyle Hidden
-
-# Stop
-Get-Process python | Where-Object {$_.MainWindowTitle -like "*claude_note*"} | Stop-Process
-
-# Logs
-Get-Content C:\path\to\vault\.claude-note\logs\worker-*.log -Tail 20 -Wait
+# Логи
+Get-Content "$env:USERPROFILE\vault\.claude-note\logs\worker-*.log" -Tail 20 -Wait
 ```
 
-For production use on Windows, consider creating a Scheduled Task or using NSSM (Non-Sucking Service Manager) to run the worker as a proper service.
+**Автозапуск вместе с Windows** — добавьте ярлык на `cn.exe` в папку автозагрузки:
+```powershell
+$startup = [Environment]::GetFolderPath("Startup")
+Copy-Item "C:\tools\cn.exe" "$startup\cn.lnk"  # или создайте ярлык вручную
+```
 
 ## Vault Structure
 
