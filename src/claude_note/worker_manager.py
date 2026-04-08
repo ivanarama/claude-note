@@ -84,10 +84,10 @@ def start_worker(foreground: bool = False, verbose: bool = False) -> bool:
 
     # Build command
     cmd = [sys.executable, "-m", "claude_note.worker"]
-    if foreground or verbose:
+    if foreground:
         cmd.extend(["--foreground"])
-        if verbose:
-            cmd.extend(["--verbose"])
+    if verbose:
+        cmd.extend(["--verbose"])
 
     if foreground:
         # Run in foreground (blocking)

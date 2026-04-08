@@ -344,6 +344,11 @@ def run_worker(foreground: bool = False, verbose: bool = False) -> int:
         foreground: If True, log to stdout as well
         verbose: If True, enable debug logging
     """
+    # Write PID file for status tracking
+    config.STATE_DIR.mkdir(parents=True, exist_ok=True)
+    pid_file = config.STATE_DIR / "worker.pid"
+    pid_file.write_text(str(os.getpid()))
+
     logger = setup_logging(verbose=verbose or foreground)
     logger.info("Worker starting")
 
