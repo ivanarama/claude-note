@@ -4,7 +4,7 @@ Automatic knowledge extraction from Claude Code sessions into your Obsidian vaul
 
 Claude Note runs as a background service, watching your Claude Code sessions and synthesizing key learnings, decisions, and questions into structured notes.
 
-**✨ Now with Windows support!** Works on macOS, Linux, and Windows 10/11.
+**✨ Now with Windows support!** Works on macOS, Linux, and Windows 10/11. Current version: **v1.5.0**.
 
 ## Features
 
@@ -16,6 +16,7 @@ Claude Note runs as a background service, watching your Claude Code sessions and
 - **Multilingual**: Synthesis prompts and UI in English and Russian
 - **Prompts Archive**: Saves all user prompts to a dedicated Obsidian note
 - **Auto-Memory**: After each session, updates `MEMORY.md` in your Claude Code project directory with durable knowledge (decisions, patterns, gotchas, how-tos)
+- **Web UI**: Browser dashboard showing session list, processing stats, and live worker status (`http://127.0.0.1:8080`)
 
 ## Requirements
 
@@ -286,7 +287,7 @@ journalctl --user -u claude-note -f
 
 - **Правый клик** → Start/Stop Worker, Start/Stop Web UI, Открыть Web UI
 - **Иконка зелёная** — всё работает; **серая** — остановлено
-- Web UI открывается в браузере на `http://127.0.0.1:8080`
+- Web UI открывается в браузере на `http://127.0.0.1:8080` — показывает список сессий, статистику и статус воркера в реальном времени
 
 ```powershell
 # Статус
