@@ -432,3 +432,7 @@ python -m pytest tests/ -v
 ## License
 
 MIT
+
+
+[**Этот репозиторий использован в статье**](https://infostart.ru/1c/articles/2659511).
+![alt text](https://infostart.ru/bitrix/templates/sandbox_empty/assets/tpl/abo/img/logo.svg)
