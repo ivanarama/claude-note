@@ -256,6 +256,8 @@ def _find_similar_content_qmd(pack: knowledge_pack.KnowledgePack, min_score: flo
         Matching note path if found, None otherwise
     """
     try:
+        if not config.QMD_SYNTH_ENABLED:
+            return None
         if not qmd_search.is_qmd_available():
             return None
 

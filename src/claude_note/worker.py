@@ -208,6 +208,19 @@ def run_synthesis(state: models.SessionState, logger: logging.Logger) -> bool:
             for err in results["errors"]:
                 logger.warning(f"Synthesis error: {err}")
 
+        # Collect synthesis results for state
+        synth_results = {
+            "inbox_updated": results.get("inbox_updated", False),
+            "notes_created": results.get("notes_created", []),
+            "notes_updated": results.get("notes_updated", []),
+            "concepts": len(pack.concepts),
+            "decisions": len(pack.decisions),
+            "memory_updated": False,
+            "memory_entries_added": 0,
+            "memory_entries_removed": 0,
+            "memory_path": None,
+        }
+
         # Update auto-memory (if enabled)
         if config.MEMORY_ENABLED:
             try:
@@ -221,9 +234,17 @@ def run_synthesis(state: models.SessionState, logger: logging.Logger) -> bool:
                     logger.info(
                         f"Memory: +{result['entries_added']}/-{result['entries_removed']} entries"
                     )
+                synth_results["memory_updated"] = result.get("memory_updated", False)
+                synth_results["memory_entries_added"] = result.get("entries_added", 0)
+                synth_results["memory_entries_removed"] = result.get("entries_removed", 0)
+                synth_results["memory_path"] = result.get("memory_path")
             except Exception as e:
                 # Don't fail synthesis if memory update fails
                 logger.warning(f"Failed to update memory: {e}")
+
+        # Save synthesis results to state
+        state.synth_results = synth_results
+        session_tracker.save_session_state(state)
 
         return True
 

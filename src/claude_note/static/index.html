@@ -18,6 +18,8 @@
     --red: #f87171;
     --yellow: #fbbf24;
     --cyan: #22d3ee;
+    --purple: #a78bfa;
+    --orange: #fb923c;
     --radius: 8px;
     --font: 'Inter', -apple-system, system-ui, sans-serif;
     --mono: 'JetBrains Mono', 'Fira Code', monospace;
@@ -33,7 +35,7 @@
     min-height: 100vh;
   }
 
-  .container { max-width: 1000px; margin: 0 auto; padding: 24px 20px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
 
   /* Header */
   header {
@@ -62,14 +64,10 @@
     border-radius: 12px;
     font-weight: 600;
   }
-  .status-badge.running {
-    color: var(--green);
-    background: #4ade8018;
-  }
-  .status-badge.stopped {
-    color: var(--text2);
-    background: var(--surface2);
-  }
+  .status-badge.running { color: var(--green); background: #4ade8018; }
+  .status-badge.stopped { color: var(--text2); background: var(--surface2); }
+  .status-badge.qmd-active { color: var(--purple); background: #a78bfa18; }
+  .status-badge.qmd-off { color: var(--text2); background: var(--surface2); opacity: 0.6; }
 
   /* Stats row */
   .stats-row {
@@ -157,12 +155,46 @@
   }
   .model-name-only { color: var(--text); }
 
-  /* Filter bar */
+  /* Filter & Search */
+  .search-filter-area {
+    margin-bottom: 16px;
+  }
+  .search-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    align-items: center;
+  }
+  .search-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 7px 12px;
+    font-family: var(--font);
+  }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text2); }
+
   .filter-bar {
     display: flex;
     gap: 6px;
-    margin-bottom: 16px;
     flex-wrap: wrap;
+    align-items: center;
+  }
+  .filter-section {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .filter-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    margin: 0 4px;
   }
   .filter-btn {
     padding: 5px 14px;
@@ -173,9 +205,11 @@
     font-size: 12px;
     cursor: pointer;
     transition: all .15s;
+    white-space: nowrap;
   }
   .filter-btn:hover { border-color: var(--accent); color: var(--text); }
   .filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .filter-btn.project-btn.active { background: var(--surface2); color: var(--accent2); border-color: var(--accent2); }
 
   /* Session list */
   .session-list { display: flex; flex-direction: column; gap: 8px; }
@@ -185,7 +219,6 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 14px 16px;
-    cursor: pointer;
     transition: border-color .15s;
   }
   .session-row:hover { border-color: var(--accent); }
@@ -193,23 +226,22 @@
   .session-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    user-select: text;
-  }
-  .session-toggle {
+    gap: 10px;
     cursor: pointer;
     user-select: none;
-    padding: 4px;
-    margin: -4px;
   }
-  .session-toggle:hover {
-    color: var(--accent);
+  .session-toggle {
+    color: var(--text2);
+    font-size: 11px;
+    min-width: 12px;
+    transition: color .15s;
   }
+  .session-row:hover .session-toggle { color: var(--accent); }
   .session-id {
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text2);
-    min-width: 50px;
+    min-width: 70px;
   }
   .session-status {
     font-size: 11px;
@@ -220,7 +252,7 @@
     border-radius: 4px;
   }
   .session-status.written { color: var(--green); background: #4ade8015; }
-  .session-status.pending { color: var(--text2); background: var(--surface2); }
+  .session-status.pending { color: var(--yellow); background: #fbbf2415; }
   .session-status.processing { color: var(--cyan); background: #22d3ee15; }
 
   .session-model {
@@ -232,13 +264,26 @@
     border-radius: 4px;
     font-family: var(--mono);
   }
+  .session-project {
+    font-size: 11px;
+    color: var(--accent2);
+    font-family: var(--mono);
+    background: #6c7ee115;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .session-project:hover { background: #6c7ee130; }
 
   .session-cwd {
     flex: 1;
-    font-size: 13px;
+    font-size: 12px;
+    color: var(--text2);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-family: var(--mono);
+    min-width: 0;
   }
   .session-meta {
     font-size: 11px;
@@ -251,6 +296,7 @@
     font-family: var(--mono);
   }
 
+  /* Session detail */
   .session-detail {
     display: none;
     margin-top: 14px;
@@ -259,27 +305,169 @@
   }
   .session-row.expanded .session-detail { display: block; }
 
-  .detail-label {
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 600px) { .detail-grid { grid-template-columns: 1fr; } }
+
+  .detail-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .detail-block-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text2);
+    margin-bottom: 6px;
+  }
+  .detail-block-value {
+    font-size: 12px;
+    color: var(--text);
+    font-family: var(--mono);
+    word-break: break-all;
+  }
+
+  /* Synth results */
+  .synth-results {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .synth-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-family: var(--mono);
+  }
+  .synth-badge.note-created { color: var(--green); background: #4ade8015; border: 1px solid #4ade8030; }
+  .synth-badge.note-updated { color: var(--cyan); background: #22d3ee15; border: 1px solid #22d3ee30; }
+  .synth-badge.inbox { color: var(--yellow); background: #fbbf2415; border: 1px solid #fbbf2430; }
+  .synth-badge.memory { color: var(--purple); background: #a78bfa15; border: 1px solid #a78bfa30; }
+  .synth-badge.concepts { color: var(--accent2); background: #6c7ee115; border: 1px solid #6c7ee130; }
+
+  /* Events timeline */
+  .events-title {
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text2);
-    margin-top: 10px;
+    margin-bottom: 8px;
+  }
+  .events-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 14px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .ev-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .ev-row:hover { background: var(--surface2); }
+  .ev-row.ev-user { border-left: 2px solid var(--accent); padding-left: 6px; }
+  .ev-row.ev-stop { opacity: 0.4; }
+  .ev-time {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text2);
+    min-width: 50px;
+    margin-top: 1px;
+  }
+  .ev-badge {
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-weight: 600;
+    font-family: var(--mono);
+    min-width: 54px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .ev-badge.write { color: var(--green); background: #4ade8020; }
+  .ev-badge.edit  { color: var(--yellow); background: #fbbf2420; }
+  .ev-badge.read  { color: var(--text2); background: var(--surface2); }
+  .ev-badge.bash  { color: var(--orange); background: #fb923c20; }
+  .ev-badge.user  { color: var(--accent2); background: #6c7ee120; }
+  .ev-badge.stop  { color: var(--text2); background: transparent; }
+  .ev-badge.tool  { color: var(--cyan); background: #22d3ee20; }
+  .ev-badge.glob  { color: var(--text2); background: var(--surface2); }
+  .ev-badge.grep  { color: var(--text2); background: var(--surface2); }
+  .ev-text {
+    flex: 1;
+    color: var(--text);
+    font-family: var(--mono);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ev-text.dim { color: var(--text2); }
+
+  .events-loading {
+    color: var(--text2);
+    font-size: 12px;
+    padding: 8px;
+    font-style: italic;
+  }
+
+  /* Timeline legend + controls */
+  .timeline-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--text2);
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+
+  .events-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
     margin-bottom: 6px;
   }
-  .detail-info {
-    font-size: 12px;
+  .toggle-reads {
+    font-size: 11px;
     color: var(--text2);
-    font-family: var(--mono);
-    background: var(--bg);
-    padding: 10px;
-    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    background: none;
+    border: none;
+    padding: 0;
   }
+  .toggle-reads:hover { color: var(--accent2); }
+
+  /* Synthesis result links */
+  .synth-badge a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .synth-badge a:hover { text-decoration: underline; }
+
   .detail-actions {
     display: flex;
     gap: 8px;
-    margin-top: 12px;
+    margin-top: 4px;
   }
 
   /* Logs */
@@ -378,6 +566,7 @@
   <header>
     <div class="logo">claude<span>-note</span></div>
     <div class="worker-status">
+      <span class="status-badge" id="qmdBadge" title="qmd vector search"></span>
       <span class="status-badge" id="workerBadge">checking...</span>
     </div>
   </header>
@@ -388,7 +577,7 @@
       <div class="stat-value" id="queueEvents">-</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Sessions</div>
+      <div class="stat-label">All Sessions</div>
       <div class="stat-value" id="totalSessions">-</div>
     </div>
     <div class="stat-card">
@@ -409,10 +598,22 @@
     </div>
   </div>
 
-  <div class="filter-bar" id="filterBar">
-    <button class="filter-btn active" data-filter="">All</button>
-    <button class="filter-btn" data-filter="pending">Pending</button>
-    <button class="filter-btn" data-filter="written">Written</button>
+  <div class="search-filter-area">
+    <div class="search-row">
+      <input class="search-input" id="searchInput" type="text"
+        placeholder="Search by session ID or path..."
+        oninput="onSearchInput()">
+      <button class="btn btn-sm btn-ghost" onclick="clearSearch()" id="clearSearchBtn" style="display:none">Clear</button>
+    </div>
+    <div class="filter-bar">
+      <div class="filter-section" id="statusFilters">
+        <button class="filter-btn active" data-filter="">All</button>
+        <button class="filter-btn" data-filter="pending">Pending</button>
+        <button class="filter-btn" data-filter="written">Written</button>
+      </div>
+      <div class="filter-sep" id="projSep" style="display:none"></div>
+      <div class="filter-section" id="projectFilters"></div>
+    </div>
   </div>
 
   <div class="session-list" id="sessionList"></div>
@@ -459,8 +660,15 @@
 <script>
 const API = '/api';
 let currentFilter = '';
+let currentProject = '';
+let searchQuery = '';
 let expandedId = null;
 let modelsCache = [];
+let allSessions = [];         // full list loaded from API
+let detailsCache = {};        // session_id -> detail with events
+let showReads = {};           // session_id -> bool (show read events)
+let vaultName = '';           // Obsidian vault name for obsidian:// links
+let inboxPath = '';           // relative path to inbox note in vault
 
 // === API calls ===
 async function apiCall(url, opts) {
@@ -487,6 +695,28 @@ async function loadStatus() {
     document.getElementById('stopBtn').disabled = true;
   }
 
+  // qmd badge
+  const qmdBadge = document.getElementById('qmdBadge');
+  const q = s.qmd || {};
+  if (q.available && q.enabled) {
+    qmdBadge.textContent = `qmd ${q.doc_count || 0} docs`;
+    qmdBadge.className = 'status-badge qmd-active';
+    qmdBadge.title = `qmd: installed, ${q.doc_count} docs indexed`;
+  } else if (q.doc_count === 0 && q.enabled !== false) {
+    // Installed but index empty
+    qmdBadge.textContent = 'qmd empty';
+    qmdBadge.className = 'status-badge qmd-off';
+    qmdBadge.title = 'qmd installed but index is empty — run: qmd index vault';
+  } else if (!q.available && q.enabled) {
+    qmdBadge.textContent = 'qmd —';
+    qmdBadge.className = 'status-badge qmd-off';
+    qmdBadge.title = 'qmd not installed';
+  } else {
+    qmdBadge.textContent = 'qmd off';
+    qmdBadge.className = 'status-badge qmd-off';
+    qmdBadge.title = 'qmd disabled in config';
+  }
+
   // Stats
   document.getElementById('queueEvents').textContent = s.queue.events;
   document.getElementById('totalSessions').textContent = s.queue.sessions;
@@ -494,91 +724,349 @@ async function loadStatus() {
   document.getElementById('pendingSessions').textContent = s.queue.pending;
 
   modelsCache = s.config.models || [];
+  vaultName = s.config.vault_name || '';
+  inboxPath = s.config.inbox_path || '';
 }
 
 // === Sessions ===
 async function loadSessions() {
-  const params = currentFilter ? `?status=${currentFilter}&limit=100` : '?limit=100';
-  const sessions = await apiCall(`${API}/sessions${params}`);
+  const params = currentFilter ? `?status=${currentFilter}&limit=200` : '?limit=200';
+  allSessions = await apiCall(`${API}/sessions${params}`);
+  buildProjectFilter();
+  renderSessions();
+}
+
+function getProjectName(cwd) {
+  if (!cwd) return null;
+  const parts = cwd.replace(/\\/g, '/').split('/').filter(Boolean);
+  if (parts.length >= 2) return parts[parts.length - 2] + '/' + parts[parts.length - 1];
+  if (parts.length === 1) return parts[0];
+  return null;
+}
+
+function buildProjectFilter() {
+  const projects = new Map(); // name -> count
+  for (const s of allSessions) {
+    const name = getProjectName(s.cwd);
+    if (name) projects.set(name, (projects.get(name) || 0) + 1);
+  }
+
+  const container = document.getElementById('projectFilters');
+  const sep = document.getElementById('projSep');
+
+  // Only show projects with >1 session or if we have filtered ones
+  const sorted = [...projects.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8); // limit to 8 most common projects
+
+  if (sorted.length > 1) {
+    sep.style.display = '';
+    container.innerHTML = sorted.map(([name, count]) => {
+      const active = currentProject === name ? ' active project-btn' : ' project-btn';
+      return `<button class="filter-btn${active}" data-project="${esc(name)}" onclick="setProjectFilter('${esc(name)}')">${esc(name)} <span style="opacity:.5">${count}</span></button>`;
+    }).join('');
+  } else {
+    sep.style.display = 'none';
+    container.innerHTML = '';
+  }
+}
+
+function setProjectFilter(name) {
+  if (currentProject === name) {
+    currentProject = '';
+  } else {
+    currentProject = name;
+  }
+  // Update button states
+  document.querySelectorAll('#projectFilters .filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.project === currentProject);
+  });
+  renderSessions();
+}
+
+function renderSessions() {
+  let sessions = allSessions;
+
+  // Apply project filter
+  if (currentProject) {
+    sessions = sessions.filter(s => getProjectName(s.cwd) === currentProject);
+  }
+
+  // Apply search
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    sessions = sessions.filter(s =>
+      s.session_id.toLowerCase().includes(q) ||
+      (s.cwd || '').toLowerCase().includes(q)
+    );
+  }
+
   const list = document.getElementById('sessionList');
 
   if (!sessions.length) {
-    list.innerHTML = `<div class="empty">No sessions${currentFilter ? ' with status "' + currentFilter + '"' : ''}.</div>`;
-    return;
-  }
-
-  // Helper to get status display
-  function getStatusLabel(s) {
-    if (s.status === 'written') return 'done';
-    return 'pending';
-  }
-
-  if (!sessions.length) {
-    list.innerHTML = `<div class="empty">No sessions${currentFilter ? ' with status "' + currentFilter + '"' : ''}.</div>`;
+    list.innerHTML = `<div class="empty">No sessions found${currentFilter ? ' with status "' + currentFilter + '"' : ''}${currentProject ? ' in project "' + esc(currentProject) + '"' : ''}${searchQuery ? ' matching "' + esc(searchQuery) + '"' : ''}.</div>`;
     return;
   }
 
   list.innerHTML = sessions.map(s => {
     const expanded = s.session_id === expandedId;
-    // Use last_event for timestamp (when last activity happened), fallback to last_write
     const timeDisplay = (s.last_event || s.last_write) ? formatTime(s.last_event || s.last_write) : '';
-    const modelDisplay = s.synth_model ? `<span class="session-model" title="Synthesized with ${esc(s.synth_model)}">${esc(s.synth_model)}</span>` : '';
+    const modelDisplay = s.synth_model ? `<span class="session-model" title="${esc(s.synth_model)}">${esc(s.synth_model)}</span>` : '';
+    const projectName = getProjectName(s.cwd);
+    const projectDisplay = projectName ? `<span class="session-project" title="${esc(s.cwd)}" onclick="event.stopPropagation();setProjectFilter('${esc(projectName)}')">${esc(projectName)}</span>` : '';
+
+    let detailHtml = '';
+    if (expanded) {
+      detailHtml = buildDetailHtml(s);
+    }
+
     return `
-    <div class="session-row${expanded ? ' expanded' : ''}">
-      <div class="session-header">
-        <span class="session-toggle" onclick="toggleSession('${s.session_id}')">${expanded ? '▼' : '▶'}</span>
+    <div class="session-row${expanded ? ' expanded' : ''}" id="sr-${s.session_id}">
+      <div class="session-header" onclick="toggleSession('${s.session_id}')">
+        <span class="session-toggle">${expanded ? '&#9660;' : '&#9654;'}</span>
         <span class="session-id">${s.session_id.slice(0, 8)}</span>
-        <span class="session-status ${s.status}">${getStatusLabel(s)}</span>
+        <span class="session-status ${s.status}">${s.status === 'written' ? 'done' : 'pending'}</span>
         ${modelDisplay}
-        <span class="session-cwd">${esc(s.cwd || 'unknown')}</span>
-        <span class="session-meta">${s.event_count} events</span>
+        ${projectDisplay}
+        <span class="session-cwd" title="${esc(s.cwd || '')}">${esc(s.cwd || 'unknown')}</span>
+        <span class="session-meta">${s.event_count} ev</span>
         ${timeDisplay ? `<span class="session-time">${timeDisplay}</span>` : ''}
       </div>
-      <div class="session-detail">
-        <div class="detail-label">Session ID</div>
-        <div class="detail-info">${s.session_id}</div>
-
-        ${s.last_event ? `
-          <div class="detail-label">Last Activity</div>
-          <div class="detail-info">${new Date(s.last_event).toLocaleString()}</div>
-        ` : ''}
-
-        ${s.last_write ? `
-          <div class="detail-label">Processed</div>
-          <div class="detail-info">${new Date(s.last_write).toLocaleString()}</div>
-        ` : ''}
-
-        ${s.synth_model ? `
-          <div class="detail-label">Synthesis Model</div>
-          <div class="detail-info">${esc(s.synth_model)}</div>
-        ` : ''}
-
-        ${s.transcript ? `
-          <div class="detail-label">Transcript</div>
-          <div class="detail-info">${s.transcript}</div>
-        ` : ''}
-
-        <div class="detail-actions">
-          <button class="btn btn-sm btn-primary" onclick="retrySession(event, '${s.session_id}')">Retry Synthesis</button>
-        </div>
-      </div>
+      <div class="session-detail">${detailHtml}</div>
     </div>`;
   }).join('');
+}
+
+function buildDetailHtml(s) {
+  const detail = detailsCache[s.session_id];
+
+  // Synthesis results section
+  let synthHtml = '';
+  const r = s.synth_results;
+  if (r) {
+    const badges = [];
+    if (r.inbox_updated) {
+      const href = vaultName && inboxPath ? `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(inboxPath)}` : '';
+      const inner = href ? `<a href="${href}" title="Open inbox in Obsidian">inbox updated</a>` : 'inbox updated';
+      badges.push(`<span class="synth-badge inbox">${inner}</span>`);
+    }
+    if (r.notes_created && r.notes_created.length) {
+      r.notes_created.forEach(n => {
+        const href = vaultName ? `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(n.replace(/\\/g,'/'))}` : '';
+        const inner = href ? `<a href="${href}" title="Open note in Obsidian">+ ${esc(n)}</a>` : `+ ${esc(n)}`;
+        badges.push(`<span class="synth-badge note-created">${inner}</span>`);
+      });
+    }
+    if (r.notes_updated && r.notes_updated.length) {
+      r.notes_updated.forEach(n => {
+        const href = vaultName ? `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(n.replace(/\\/g,'/'))}` : '';
+        const inner = href ? `<a href="${href}" title="Open note in Obsidian">~ ${esc(n)}</a>` : `~ ${esc(n)}`;
+        badges.push(`<span class="synth-badge note-updated">${inner}</span>`);
+      });
+    }
+    if (r.concepts) badges.push(`<span class="synth-badge concepts">${r.concepts} concepts, ${r.decisions || 0} decisions</span>`);
+    if (r.memory_updated) {
+      const mem = `memory +${r.memory_entries_added}/-${r.memory_entries_removed}`;
+      const href = r.memory_path ? `file:///${r.memory_path.replace(/\\/g,'/')}` : '';
+      const inner = href ? `<a href="${href}" title="Open MEMORY.md">${mem}</a>` : mem;
+      badges.push(`<span class="synth-badge memory">${inner}</span>`);
+    }
+    if (badges.length) {
+      synthHtml = `<div class="events-title">Synthesis results</div><div class="synth-results">${badges.join('')}</div>`;
+    }
+  }
+
+  // Info grid
+  const infoHtml = `
+  <div class="detail-grid">
+    <div class="detail-block">
+      <div class="detail-block-title">Session ID</div>
+      <div class="detail-block-value">${s.session_id}</div>
+    </div>
+    <div class="detail-block">
+      <div class="detail-block-title">Project path</div>
+      <div class="detail-block-value">${esc(s.cwd || '—')}</div>
+    </div>
+    ${s.last_event ? `
+    <div class="detail-block">
+      <div class="detail-block-title">Last activity</div>
+      <div class="detail-block-value">${new Date(s.last_event).toLocaleString()}</div>
+    </div>` : ''}
+    ${s.last_write ? `
+    <div class="detail-block">
+      <div class="detail-block-title">Synthesized at</div>
+      <div class="detail-block-value">${new Date(s.last_write).toLocaleString()}</div>
+    </div>` : ''}
+  </div>`;
+
+  // Events timeline
+  let eventsHtml = '';
+  if (!detail) {
+    eventsHtml = `<div class="events-loading">Loading events...</div>`;
+    fetchDetail(s.session_id);
+  } else if (detail.events && detail.events.length) {
+    const sessionStart = new Date(detail.events[0].ts);
+    const showR = showReads[s.session_id] !== false; // default show
+    const readCount = detail.events.filter(e => isReadEvent(e)).length;
+    const visibleCount = showR ? detail.events.length : detail.events.length - readCount;
+
+    const rows = detail.events.map(e => {
+      const parsed = parseEvent(e);
+      if (!showR && parsed.type === 'read') return '';
+      if (!showR && (parsed.type === 'glob' || parsed.type === 'grep')) return '';
+      const elapsed = formatElapsed(new Date(e.ts) - sessionStart);
+      const dimClass = (parsed.type === 'read' || parsed.type === 'glob' || parsed.type === 'grep' || parsed.type === 'stop') ? ' dim' : '';
+      return `<div class="ev-row ev-${parsed.type}">
+        <span class="ev-time">+${elapsed}</span>
+        <span class="ev-badge ${parsed.type}">${esc(parsed.label)}</span>
+        <span class="ev-text${dimClass}" title="${esc(e.description || '')}">${esc(parsed.text)}</span>
+      </div>`;
+    }).join('');
+
+    // Legend
+    const legendHtml = `
+    <div class="timeline-legend">
+      <span style="font-weight:600;margin-right:4px">Legend:</span>
+      <span class="legend-item"><span class="ev-badge user" style="font-size:10px;padding:1px 6px;">user</span> ваш промпт</span>
+      <span class="legend-item"><span class="ev-badge write" style="font-size:10px;padding:1px 6px;">Write</span> создан файл</span>
+      <span class="legend-item"><span class="ev-badge edit" style="font-size:10px;padding:1px 6px;">Edit</span> изменён файл</span>
+      <span class="legend-item"><span class="ev-badge bash" style="font-size:10px;padding:1px 6px;">Bash</span> команда</span>
+      <span class="legend-item"><span class="ev-badge read" style="font-size:10px;padding:1px 6px;">Read</span> чтение (${readCount} шт.)</span>
+      <span class="legend-item"><span class="ev-badge stop" style="font-size:10px;padding:1px 6px;">stop</span> сессия остановлена</span>
+      <span style="color:var(--text2);font-size:10px">+0s = время от начала сессии</span>
+    </div>`;
+
+    const toggleLabel = showR
+      ? `Скрыть чтение файлов (${readCount} строк)`
+      : `Показать чтение файлов (${readCount} строк)`;
+    const controlsHtml = readCount > 0 ? `
+    <div class="events-controls">
+      <button class="toggle-reads" onclick="toggleReads('${s.session_id}')">${toggleLabel}</button>
+      <span style="font-size:11px;color:var(--text2)">показано ${visibleCount} из ${detail.events.length}</span>
+    </div>` : '';
+
+    eventsHtml = `
+    <div class="events-title">Timeline (${detail.events.length} событий)</div>
+    ${legendHtml}
+    ${controlsHtml}
+    <div class="events-timeline">${rows}</div>`;
+  }
+
+  // Actions
+  const actionsHtml = `
+  <div class="detail-actions">
+    <button class="btn btn-sm btn-primary" onclick="retrySession(event, '${s.session_id}')">Retry Synthesis</button>
+  </div>`;
+
+  return synthHtml + infoHtml + eventsHtml + actionsHtml;
+}
+
+const SCAN_TOOLS = new Set(['read', 'glob', 'grep']);
+
+function isReadEvent(e) {
+  if (e.event !== 'PostToolUse') return false;
+  const m = e.description && e.description.match(/\*\*(\w+)\*\*/);
+  return m ? SCAN_TOOLS.has(m[1].toLowerCase()) : false;
+}
+
+function parseEvent(e) {
+  if (e.event === 'UserPromptSubmit') {
+    let text = e.description || '';
+    text = text.replace(/^User prompt: /, '').replace(/^"(.*)"$/, '$1');
+    if (text.length > 80) text = text.slice(0, 80) + '...';
+    return { type: 'user', label: 'user', text };
+  }
+  if (e.event === 'Stop') {
+    return { type: 'stop', label: 'stop', text: 'session stopped' };
+  }
+  if (e.event === 'PostToolUse') {
+    const m = (e.description || '').match(/\*\*(\w+)\*\*\s*`([^`]*)`/);
+    if (m) {
+      const tool = m[1].toLowerCase();
+      const arg = m[2];
+      return { type: tool, label: m[1], text: arg };
+    }
+    return { type: 'tool', label: 'tool', text: e.description || '' };
+  }
+  return { type: 'other', label: e.event, text: e.description || '' };
+}
+
+function formatElapsed(ms) {
+  if (ms < 0) return '0s';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return m + 'm' + (rem ? rem + 's' : '');
+}
+
+async function fetchDetail(id) {
+  try {
+    const detail = await apiCall(`${API}/sessions/${id}`);
+    detailsCache[id] = detail;
+    // Re-render the specific session row without full reload
+    const s = allSessions.find(x => x.session_id === id);
+    if (s && expandedId === id) {
+      const row = document.getElementById('sr-' + id);
+      if (row) {
+        const detailEl = row.querySelector('.session-detail');
+        if (detailEl) detailEl.innerHTML = buildDetailHtml(s);
+      }
+    }
+  } catch (e) {
+    console.error('Failed to fetch session detail:', e);
+  }
+}
+
+function toggleReads(id) {
+  showReads[id] = showReads[id] === false ? true : false;
+  const s = allSessions.find(x => x.session_id === id);
+  if (s && expandedId === id) {
+    const row = document.getElementById('sr-' + id);
+    if (row) {
+      const detailEl = row.querySelector('.session-detail');
+      if (detailEl) detailEl.innerHTML = buildDetailHtml(s);
+    }
+  }
 }
 
 async function retrySession(e, id) {
   e.stopPropagation();
   try {
     await apiCall(`${API}/sessions/${id}/retry`, { method: 'POST' });
-    refresh();
+    // Invalidate cache for this session
+    delete detailsCache[id];
+    await loadSessions();
   } catch (err) {
     alert('Retry failed: ' + err.message);
   }
 }
 
-function toggleSession(id) {
-  expandedId = expandedId === id ? null : id;
-  loadSessions();
+async function toggleSession(id) {
+  if (expandedId === id) {
+    expandedId = null;
+  } else {
+    expandedId = id;
+    // Pre-fetch detail if not cached
+    if (!detailsCache[id]) {
+      fetchDetail(id); // async, will re-render when done
+    }
+  }
+  renderSessions();
+}
+
+// === Search ===
+function onSearchInput() {
+  searchQuery = document.getElementById('searchInput').value;
+  document.getElementById('clearSearchBtn').style.display = searchQuery ? '' : 'none';
+  renderSessions();
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  searchQuery = '';
+  document.getElementById('clearSearchBtn').style.display = 'none';
+  renderSessions();
 }
 
 // === Worker ===
@@ -592,11 +1080,19 @@ async function stopWorker() {
   refresh();
 }
 
+// === Status filters ===
+document.getElementById('statusFilters').addEventListener('click', e => {
+  if (!e.target.matches('.filter-btn')) return;
+  document.querySelectorAll('#statusFilters .filter-btn').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  currentFilter = e.target.dataset.filter;
+  loadSessions();
+});
+
 // === Model Config ===
 let modelSuggestions = [];
 
 async function openModelConfig() {
-  // Reload fresh data from server
   await loadStatus();
   renderModelList();
   loadModelPresets();
@@ -627,15 +1123,12 @@ async function loadModelPresets() {
 function onPresetSelect() {
   const select = document.getElementById('modelPresetSelect');
   const input = document.getElementById('newModelInput');
-  if (select.value) {
-    input.value = select.value;
-  }
+  if (select.value) input.value = select.value;
 }
 
 function renderModelList() {
   const list = document.getElementById('modelList');
 
-  // Helper to parse model entry
   function parseModel(entry) {
     if (entry.includes(':')) {
       const [profile, model] = entry.split(':', 2);
@@ -654,9 +1147,9 @@ function renderModelList() {
     <div class="model-item">
       <span class="model-name">${display}</span>
       <div class="model-actions">
-        <button class="btn btn-sm btn-ghost" onclick="moveModel(${i}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
-        <button class="btn btn-sm btn-ghost" onclick="moveModel(${i}, 1)" ${i === modelsCache.length - 1 ? 'disabled' : ''}>↓</button>
-        <button class="btn btn-sm btn-danger" onclick="removeModel(${i})">×</button>
+        <button class="btn btn-sm btn-ghost" onclick="moveModel(${i}, -1)" ${i === 0 ? 'disabled' : ''}>&#8593;</button>
+        <button class="btn btn-sm btn-ghost" onclick="moveModel(${i}, 1)" ${i === modelsCache.length - 1 ? 'disabled' : ''}>&#8595;</button>
+        <button class="btn btn-sm btn-danger" onclick="removeModel(${i})">&#215;</button>
       </div>
     </div>`;
   }).join('');
@@ -687,16 +1180,15 @@ function addModel() {
 
 async function saveModelConfig() {
   try {
-    const result = await apiCall(`${API}/models`, {
+    await apiCall(`${API}/models`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(modelsCache),
     });
-    // Reload models from server to confirm save
     await loadStatus();
     closeModelConfig();
   } catch (err) {
-    alert('Failed to save: ' + err.message + '\n\nCheck console for details');
+    alert('Failed to save: ' + err.message);
     console.error('Save error:', err);
   }
 }
@@ -716,7 +1208,6 @@ async function loadLogs() {
     if (l.level === 'ERROR') levelClass = 'log-error';
     else if (l.level === 'WARNING') levelClass = 'log-warn';
 
-    // Parse timestamp: "YYYY-MM-DD HH:MM:SS,mmm" -> extract HH:MM:SS
     const timePart = l.timestamp.split(' ')[1]?.slice(0, 8) || '';
     return `
     <div class="log-entry">
@@ -729,19 +1220,10 @@ async function loadLogs() {
 
 function refreshLogs() { loadLogs(); }
 
-// === Filters ===
-document.getElementById('filterBar').addEventListener('click', e => {
-  if (!e.target.matches('.filter-btn')) return;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  e.target.classList.add('active');
-  currentFilter = e.target.dataset.filter;
-  loadSessions();
-});
-
 // === Helpers ===
 function esc(s) {
   const d = document.createElement('div');
-  d.textContent = s;
+  d.textContent = String(s || '');
   return d.innerHTML;
 }
 
@@ -750,19 +1232,9 @@ function formatTime(isoString) {
   const now = new Date();
   const diff = now - date;
 
-  // Less than 1 minute
-  if (diff < 60000) {
-    return Math.floor(diff / 1000) + 's';
-  }
-  // Less than 1 hour
-  if (diff < 3600000) {
-    return Math.floor(diff / 60000) + 'm';
-  }
-  // Less than 1 day
-  if (diff < 86400000) {
-    return Math.floor(diff / 3600000) + 'h';
-  }
-  // Show date for older
+  if (diff < 60000) return Math.floor(diff / 1000) + 's';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h';
   return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
 }
 
@@ -770,7 +1242,7 @@ function refresh() { loadStatus(); loadSessions(); loadLogs(); }
 
 // === Init ===
 refresh();
-setInterval(refresh, 5000);
+setInterval(refresh, 8000);
 </script>
 </body>
 </html>

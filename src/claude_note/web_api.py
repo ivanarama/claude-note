@@ -32,6 +32,7 @@ from . import vault_indexer
 from . import cleaner
 from . import synthesizer
 from . import worker_manager
+from . import qmd_search
 from pydantic import BaseModel
 
 
@@ -233,8 +234,15 @@ async def get_status() -> dict:
         },
         "config": {
             "vault_root": str(config.VAULT_ROOT),
+            "vault_name": config.VAULT_ROOT.name,
+            "inbox_path": str(config.INBOX_PATH).replace(str(config.VAULT_ROOT), "").lstrip("/\\").replace("\\", "/"),
             "synth_mode": config.SYNTH_MODE,
             "models": config.SYNTH_MODELS,
+        },
+        "qmd": {
+            "available": qmd_search.is_qmd_available(),
+            "enabled": config.QMD_SYNTH_ENABLED,
+            "doc_count": qmd_search.get_doc_count(),
         },
     }
 
@@ -284,6 +292,7 @@ async def list_sessions(limit: int = 100, status: Optional[str] = None) -> List[
             "last_event": state.last_event_ts if state else None,
             "synth_model": state.synth_model if state else None,
             "transcript": str(state.transcript_path) if state and state.transcript_path else None,
+            "synth_results": state.synth_results if state else None,
         })
 
     # Sort by most recent activity

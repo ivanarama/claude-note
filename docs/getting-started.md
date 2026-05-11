@@ -58,7 +58,7 @@ python -m claude_note worker --foreground --verbose
 ```
 
 **Windows Notes:**
-- Use `python -m claude_note` instead of `claude-note` command
+- If `claude-note` is not recognized, add the Python Scripts dir to PATH (e.g. `%APPDATA%\Python\Python311\Scripts`) — avoid using `python -m claude_note` as `python` may point to the wrong version
 - Background service: Use Task Scheduler or run as a scheduled task
 - Config file uses Windows path format with double backslashes
 
@@ -157,21 +157,21 @@ Claude Note receives events from Claude Code through hooks. Add this to `~/.clau
     "PostToolUse": [
       {
         "hooks": [
-          { "type": "command", "command": "python -m claude_note enqueue", "timeout": 5000 }
+          { "type": "command", "command": "claude-note enqueue", "timeout": 5000 }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "python -m claude_note enqueue", "timeout": 5000 }
+          { "type": "command", "command": "claude-note enqueue", "timeout": 5000 }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "python -m claude_note enqueue", "timeout": 5000 }
+          { "type": "command", "command": "claude-note enqueue", "timeout": 5000 }
         ]
       }
     ]

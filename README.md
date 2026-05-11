@@ -225,27 +225,29 @@ Add to your Claude Code settings (`~/.claude/settings.json`):
     "PostToolUse": [
       {
         "hooks": [
-          { "type": "command", "command": "python -m claude_note enqueue", "timeout": 5000 }
+          { "type": "command", "command": "claude-note enqueue", "timeout": 5000 }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "python -m claude_note enqueue", "timeout": 5000 }
+          { "type": "command", "command": "claude-note enqueue", "timeout": 5000 }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "python -m claude_note enqueue", "timeout": 5000 }
+          { "type": "command", "command": "claude-note enqueue", "timeout": 5000 }
         ]
       }
     ]
   }
 }
 ```
+
+> **Note:** If you get `'claude-note' is not recognized`, add the Python Scripts directory to your PATH (e.g. `%APPDATA%\Python\Python311\Scripts`) or use the full path: `C:\path\to\Scripts\claude-note.exe enqueue`.
 
 See [docs/hook-setup.md](docs/hook-setup.md) for detailed instructions.
 
@@ -407,6 +409,35 @@ synth_max_notes = 5  # Include top N relevant notes as context
 ```
 
 This improves synthesis quality by providing relevant vault context.
+
+### Windows: fixing qmd after npm install
+
+`qmd` ships a Unix shell wrapper that breaks on Windows. After `npm install -g @tobilu/qmd`, fix the PowerShell shim manually:
+
+**File:** `%APPDATA%\npm\qmd.ps1`
+
+Replace its contents with:
+
+```powershell
+#!/usr/bin/env pwsh
+$basedir=Split-Path $MyInvocation.MyCommand.Definition -Parent
+$qmdjs="$basedir/node_modules/@tobilu/qmd/dist/cli/qmd.js"
+
+if ($MyInvocation.ExpectingInput) {
+  $input | & "node" $qmdjs $args
+} else {
+  & "node" $qmdjs $args
+}
+exit $LASTEXITCODE
+```
+
+This bypasses the `/bin/sh` wrapper and calls `dist/cli/qmd.js` directly via `node`.
+
+After that, verify it works:
+
+```powershell
+qmd collection add C:\path\to\your\vault --name vault
+```
 
 ## Testing
 

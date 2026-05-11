@@ -4,15 +4,20 @@
 
 block_cipher = None
 
+# Collect pydantic fully — pydantic v2 ships a pydantic.v1 compat subpackage
+# that PyInstaller fails to extract on Windows without explicit collection.
+from PyInstaller.utils.hooks import collect_all
+pydantic_datas, pydantic_binaries, pydantic_hiddenimports = collect_all('pydantic')
+
 a = Analysis(
     ['main.py'],
-    pathex=[],
-    binaries=[],
+    pathex=['src'],
+    binaries=pydantic_binaries,
     datas=[
         # Bundle static web UI files
         ('src/claude_note/static', 'claude_note/static'),
-    ],
-    hiddenimports=[
+    ] + pydantic_datas,
+    hiddenimports=pydantic_hiddenimports + [
         # uvicorn dynamic imports
         'uvicorn.logging',
         'uvicorn.loops',
