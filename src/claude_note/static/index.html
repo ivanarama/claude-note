@@ -1004,13 +1004,18 @@ async function fetchDetail(id) {
   try {
     const detail = await apiCall(`${API}/sessions/${id}`);
     detailsCache[id] = detail;
-    // Re-render the specific session row without full reload
     const s = allSessions.find(x => x.session_id === id);
     if (s && expandedId === id) {
       const row = document.getElementById('sr-' + id);
       if (row) {
+        const tl = row.querySelector('.events-timeline');
+        const savedTl = tl ? tl.scrollTop : 0;
         const detailEl = row.querySelector('.session-detail');
         if (detailEl) detailEl.innerHTML = buildDetailHtml(s);
+        if (savedTl) {
+          const newTl = row.querySelector('.events-timeline');
+          if (newTl) newTl.scrollTop = savedTl;
+        }
       }
     }
   } catch (e) {
@@ -1238,7 +1243,7 @@ function formatTime(isoString) {
   return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
 }
 
-function refresh() { loadStatus(); loadSessions(); loadLogs(); }
+function refresh() { loadStatus(); if (!expandedId) loadSessions(); loadLogs(); }
 
 // === Init ===
 refresh();
